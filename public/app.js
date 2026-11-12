@@ -1,6 +1,6 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
-import { vQuest, questCard, loadDone } from './quest.js';
+import { vQuest, vSim, questCard, loadDone, loadQuests } from './quest.js';
 import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -118,7 +118,8 @@ async function loadBase() {
   const L = level(S.stats.total);
   if (S.lv != null && S.lvConcept === S.concept && L.i > S.lv) setTimeout(() => coach({ concept: S.concept, center: true, mood: 'victory', text: `Новый уровень: ${L.icon} ${L.name}! Ты растёшь — так держать.`, actions: [{ label: 'Ура!' }] }), 700);
   S.lv = L.i; S.lvConcept = S.concept;
-  S.quest = await loadDone(sb, S.me.id);
+  S.quests = await loadQuests(sb, S.concept); S.mainQuest = S.quests.find((q) => q.kind === 'quest');
+  S.quest = await loadDone(sb, S.me.id, S.mainQuest?.id);
   const { data: ach } = await sb.from('achievements').select('*').eq('user_id', S.me.id); S.ach = ach || [];
 }
 
@@ -145,7 +146,8 @@ async function route() {
     if (r === 'play') { tabs(p[2] ? 'learn' : 'home'); return await vPlay(p[1], p[2] ? decodeURIComponent(p[2]) : null); }
     if (r === 'shop') { tabs('home'); return await vShop(p[1]); }
     if (r === 'games') { tabs('home'); return await vGames(); }
-    if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx()); }
+    if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx(), p[1] ? decodeURIComponent(p[1]) : S.mainQuest?.id); }
+    if (r === 'sim') { $tabs.hidden = true; return await vSim(ctx(), decodeURIComponent(p[1])); }
     if (r === 'book') { tabs('book'); return await vBook(p[1]); }
     if (r === 'rating') { tabs('rating'); return await vRating(p[1] || 'month'); }
     if (r === 'me') { tabs('me'); return await vMe(); }
@@ -191,7 +193,7 @@ async function vHome() {
       <a class="b3 b3-play" href="#/games"><span class="e">🎮</span><b>Играть</b><small>квест, блиц</small></a>
       <a class="b3 b3-rate" href="#/rating"><span class="e">🏆</span><b>Рейтинг</b><small>${S.stats.month} за месяц</small></a>
     </div>
-    ${S.concept === 'vilka' ? questCard(S.quest) : ''}
+    ${S.mainQuest && S.quest.size < S.mainQuest.steps.length ? questCard(S.mainQuest, S.quest) : ''}
     ${hero}
     <div class="goal"><div class="ring" style="--p:${gp}"><span>${S.today}/${GOAL}</span></div>
       <div><b>${gp >= 100 ? 'Цель дня выполнена 🎉' : 'Цель дня — 30 баллов'}</b><span class="small muted">${gp >= 100 ? 'Серия продолжается. Завтра — новая цель' : 'Урок, квиз или блиц — и серия не прервётся'}</span></div></div>
@@ -203,7 +205,7 @@ async function vHome() {
     ${(news || []).length ? `<div class="sec-t"><span class="h2">Новости</span></div>` + news.map((n) => `<div class="news ${rd.has(n.id) ? '' : 'unread'}"><b>${esc(n.title)}</b>${n.body ? `<span class="small">${esc(n.body)}</span>` : ''}<span class="small muted">${new Date(n.created_at).toLocaleDateString('ru-RU')}</span></div>`).join('') : ''}
   </div>`;
   const unread = (news || []).filter((n) => !rd.has(n.id));
-  if (S.concept === 'vilka') { const el = document.getElementById('qxm'); if (el) { const c = new Character(el, 'shefi', 'invite'); setTimeout(() => c.react('invite'), 700); } }
+  { const el = document.querySelector('.qx-m'); if (el) { const c = new Character(el, 'shefi', 'invite'); setTimeout(() => c.react('invite'), 700); } }
   if (!tour()) greetDaily(nb);
   if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
@@ -278,6 +280,65 @@ async function vShop(sub) {
     coach({ concept: S.concept, center: true, mood: 'victory', text: `Готово! «${r.title}» твой. Код получения: ${data.code}. Покажи его сервис-менеджеру, когда заказ будет «Можно забрать».`, actions: [{ label: 'Отлично!', onClick: () => vShop() }] });
   });
 }
+const TYPE = { intro: 'Приветствие', video: 'Интерактивное видео', quiz: 'Вопросы с фото', stack: 'Игра «по порядку»', dialogue: 'Диалог с гостем' };
+async function aQuests(ab, arg) {
+  const { data: all } = await sb.from('quests').select('*').order('kind').order('sort');
+  const list = (all || []).filter((q) => !q.concept || q.concept === S.concept);
+  if (arg) { const [qid, sid] = arg.split('~'); const q = (all || []).find((x) => x.id === qid); return dlgEditor(ab, q || null, sid); }
+  ab.innerHTML = h`<p class="muted">Квесты и симуляторы ${S.concept === 'grano' ? 'GRANO' : 'VILKA'}. Диалоги с гостем можно писать и править здесь — без программирования.</p>
+    <button class="btn" id="newsim">+ Новый симулятор «ситуация с гостем»</button>
+    ${list.map((q) => `<div class="card stack" style="gap:10px"><div class="row between"><div><b>${esc(q.title)}</b><div class="small muted">${q.kind === 'quest' ? 'Квест' : 'Симулятор'} · ${q.concept ? q.concept.toUpperCase() : 'все'}</div></div>
+      <label class="switch"><input type="checkbox" data-act="${esc(q.id)}" ${q.active ? 'checked' : ''}> показывать</label></div>
+      <div class="stack" style="gap:6px">${q.steps.map((st) => `<div class="row between small"><span>${esc(st.ic || '')} ${esc(st.zone || '')} — ${TYPE[st.type] || st.type} · ${st.pts || 0} баллов</span>${st.type === 'dialogue' ? `<a class="btn sm ghost" href="#/admin/quests/${encodeURIComponent(q.id + '~' + st.id)}">Редактировать</a>` : ''}</div>`).join('')}</div>
+      <div><a class="btn sm" href="#/${q.kind === 'quest' ? 'quest' : 'sim'}/${encodeURIComponent(q.id)}">Пройти</a></div></div>`).join('')}`;
+  ab.querySelectorAll('[data-act]').forEach((c) => c.onchange = async () => { const { error } = await sb.from('quests').update({ active: c.checked }).eq('id', c.dataset.act); toast(error ? error.message : c.checked ? 'Показывается сотрудникам' : 'Скрыто'); });
+  document.getElementById('newsim').onclick = () => dlgEditor(ab, null, null);
+}
+function dlgEditor(ab, q, sid) {
+  const isNew = !q, step = q ? q.steps.find((x) => x.id === (sid || 'guest')) : null;
+  const d = step ? JSON.parse(JSON.stringify(step.data)) : { who: 'Гость, стол 1', summary: '', turns: [{ g: '', o: [{ t: '', s: 2, r: '', f: '' }, { t: '', s: 1, r: '', f: '' }, { t: '', s: 0, r: '', f: '' }] }] };
+  let title = q ? q.title : '', subtitle = q ? q.subtitle || '' : '', concept = q ? q.concept : S.concept;
+  const SC = [[2, '✅ Лучший ответ'], [1, '🟡 Неплохо'], [0, '❌ Ошибка']];
+  const draw = () => {
+    ab.innerHTML = h`<a class="back" href="#/admin/quests">‹</a>
+      <div class="h2">${isNew ? 'Новый симулятор' : esc(q.title)} ${step && q.kind === 'quest' ? '· диалог в квесте' : ''}</div>
+      <div class="card stack">
+        ${isNew || q.kind === 'sim' ? `<div class="grid2"><input id="dt" placeholder="Название, например «Гость просит счёт раньше»" value="${esc(title)}"><input id="ds" placeholder="Подзаголовок" value="${esc(subtitle)}">
+          <select id="dc"><option value="grano" ${concept === 'grano' ? 'selected' : ''}>GRANO</option><option value="vilka" ${concept === 'vilka' ? 'selected' : ''}>VILKA</option></select></div>` : ''}
+        <div class="grid2"><input id="dw" placeholder="Кто гость, например «Гость, стол 4»" value="${esc(d.who || '')}"></div>
+        <textarea id="dsum" rows="2" placeholder="Вывод в конце: как правильно действовать">${esc(d.summary || '')}</textarea>
+      </div>
+      ${d.turns.map((t, i) => `<div class="card stack" data-t="${i}"><div class="row between"><b>Шаг ${i + 1}</b>${d.turns.length > 1 ? `<button class="btn sm ghost" data-del="${i}">Удалить шаг</button>` : ''}</div>
+        <textarea data-f="g" rows="2" placeholder="Что говорит гость">${esc(t.g)}</textarea>
+        ${t.o.map((o, k) => `<div class="stack opt-ed" data-o="${k}" style="gap:6px;border-left:4px solid ${o.s == 2 ? 'var(--ok)' : o.s == 1 ? 'var(--acc2)' : 'var(--bad)'};padding-left:10px">
+          <div class="row"><select data-f="s" style="max-width:190px">${SC.map(([v, l]) => `<option value="${v}" ${+o.s === v ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="small muted">Вариант ${'АБВГ'[k]}</span></div>
+          <textarea data-f="t" rows="2" placeholder="Ответ официанта">${esc(o.t)}</textarea>
+          <input data-f="r" placeholder="Реакция гостя" value="${esc(o.r || '')}"><input data-f="f" placeholder="Пояснение Шефи: почему так или как лучше" value="${esc(o.f || '')}"></div>`).join('')}
+      </div>`).join('')}
+      <div class="row"><button class="btn ghost" id="addt">+ Шаг диалога</button><button class="btn" id="save">Сохранить</button></div>`;
+    const collect = () => {
+      title = ab.querySelector('#dt')?.value ?? title; subtitle = ab.querySelector('#ds')?.value ?? subtitle; concept = ab.querySelector('#dc')?.value ?? concept;
+      d.who = ab.querySelector('#dw').value; d.summary = ab.querySelector('#dsum').value;
+      ab.querySelectorAll('[data-t]').forEach((tc) => { const t = d.turns[+tc.dataset.t]; t.g = tc.querySelector('[data-f="g"]').value;
+        tc.querySelectorAll('[data-o]').forEach((oc) => { const o = t.o[+oc.dataset.o]; o.s = +oc.querySelector('[data-f="s"]').value; o.t = oc.querySelector('[data-f="t"]').value; o.r = oc.querySelector('[data-f="r"]').value; o.f = oc.querySelector('[data-f="f"]').value; }); });
+    };
+    ab.querySelector('#addt').onclick = () => { collect(); d.turns.push({ g: '', o: [{ t: '', s: 2, r: '', f: '' }, { t: '', s: 1, r: '', f: '' }, { t: '', s: 0, r: '', f: '' }] }); draw(); };
+    ab.querySelectorAll('[data-del]').forEach((b) => b.onclick = () => { collect(); d.turns.splice(+b.dataset.del, 1); draw(); });
+    ab.querySelector('#save').onclick = async () => {
+      collect();
+      d.turns = d.turns.map((t) => ({ ...t, o: t.o.filter((o) => o.t.trim()) })).filter((t) => t.g.trim() && t.o.length);
+      if (!d.turns.length) return toast('Заполните хотя бы один шаг: слова гостя и ответы');
+      if (d.turns.some((t) => t.o.length < 2 || !t.o.some((o) => o.s === 2))) return toast('В каждом шаге нужно минимум 2 ответа и один «лучший»');
+      if ((isNew || q.kind === 'sim') && !title.trim()) return toast('Введите название');
+      let error;
+      if (isNew) ({ error } = await sb.from('quests').insert({ id: 'sim-' + Date.now().toString(36), concept, kind: 'sim', title, subtitle, steps: [{ id: 'guest', zone: 'Зал', ic: '💬', type: 'dialogue', pts: 30, data: d }] }));
+      else { const steps = q.steps.map((x) => (x.id === step.id ? { ...x, data: d } : x)); ({ error } = await sb.from('quests').update({ steps, ...(q.kind === 'sim' ? { title, subtitle, concept } : {}), updated_at: new Date().toISOString() }).eq('id', q.id)); }
+      if (error) return toast(error.message);
+      toast('Сохранено'); await loadBase(); location.hash = '#/admin/quests';
+    };
+  };
+  draw();
+}
 async function aShop(ab) {
   const [{ data: items }, { data: orders }, { data: ppl }] = await Promise.all([
     sb.from('rewards').select('*').order('sort'),
@@ -322,22 +383,26 @@ async function vGames() {
   const vilka = S.concept === 'vilka';
   $app.innerHTML = h`<div class="stack">
     <div class="row"><a class="back" href="#/home">‹</a><div class="h1">Играть</div></div>
-    ${vilka ? questCard(S.quest) : `<div class="game soon"><span class="e">🗺️</span><div><b>Квест «Первая смена в GRANO»</b><small>Скоро: кухня, печь, раздача и зал</small></div></div>`}
+    <div class="sec-t"><span class="h2">Квесты</span></div>
+    ${S.quests.filter((q) => q.kind === 'quest').map((q) => questCard(q, q.id === S.mainQuest?.id ? S.quest : new Set())).join('') || '<p class="muted">Квесты скоро появятся.</p>'}
+    <div class="sec-t"><span class="h2">Симуляторы: гость</span></div>
+    ${S.quests.filter((q) => q.kind === 'sim').map((q) => `<a class="game g-sim" href="#/sim/${encodeURIComponent(q.id)}"><span class="e">💬</span><div><b>${esc(q.title)}</b><small>${esc(q.subtitle || 'Ситуация с гостем')}</small></div><span class="go">›</span></a>`).join('') || '<p class="muted">Симуляторы скоро появятся.</p>'}
+    <div class="sec-t"><span class="h2">Игры</span></div>
     <a class="game g-speed" href="#/play/speed"><span class="e">⚡</span><div><b>Блиц 60 секунд</b><small>Сколько верных ответов успеешь? До 15 баллов в день</small></div><span class="go">›</span></a>
     <a class="game g-rev" href="#/play/review"><span class="e">🔁</span><div><b>Повторение</b><small>${S.stats.due ? `${S.stats.due} ${plural(S.stats.due, 'вопрос ждёт', 'вопроса ждут', 'вопросов ждут')} повторения` : 'Сейчас повторять нечего'}</small></div><span class="go">›</span></a>
     <div class="game soon"><span class="e">🍔</span><div><b>Собери блюдо по слоям</b><small>Скоро для всех блюд меню</small></div></div>
     <div class="game soon"><span class="e">🔍</span><div><b>Найди ошибку на фото</b><small>Скоро: сервировка и подача</small></div></div>
   </div>`;
-  if (vilka) { const el = document.getElementById('qxm'); if (el) new Character(el, 'shefi', 'invite').react('invite'); }
+  document.querySelectorAll('.qx-m').forEach((el) => new Character(el, 'shefi', 'invite').react('invite'));
 }
 function greetDaily(nb) {
   const k = 'vg_hi_' + S.me.id + '_' + S.concept + '_' + new Date().toDateString();
   try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch (e) { return; }
   const name = S.me.full_name.split(' ')[0], who = CAST.shefi.name;
   let text, actions;
-  if (S.concept === 'vilka' && S.quest.size < 4) {
-    text = `Привет, ${name}! Я ${who}. Сегодня проходим первую смену: кухня, раздача и зал. Готов?`;
-    actions = [{ label: 'Начать квест', onClick: () => (location.hash = '#/quest') }, { label: 'Позже' }];
+  if (S.mainQuest && S.quest.size < S.mainQuest.steps.length) {
+    text = `Привет, ${name}! Я ${who}. Сегодня проходим квест «${S.mainQuest.title}». Готов?`;
+    actions = [{ label: 'Начать квест', onClick: () => (location.hash = '#/quest/' + encodeURIComponent(S.mainQuest.id)) }, { label: 'Позже' }];
   } else if (nb) {
     text = `Привет, ${name}! Я ${who}. Сегодня изучаем «${nb.title}». Поехали?`;
     actions = [{ label: 'Начать', onClick: () => (location.hash = '#/block/' + encodeURIComponent(nb.id)) }, { label: 'Позже' }];
@@ -585,7 +650,7 @@ function badges() {
   const passed = bl.filter((b) => b.passed).length, lessons = bl.filter((b) => b.lesson).length;
   return [
     ['📘', 'Первый урок', lessons >= 1], ['🎓', 'Первый тест', passed >= 1], ['🧠', '5 разделов', passed >= 5], ['🏅', '10 разделов', passed >= 10],
-    ['🎖️', 'Первая смена', (S.ach || []).some((a) => a.code === 'quest:first-shift')], ['🔥', '3 дня подряд', s.streak >= 3], ['⚡', 'Неделя подряд', s.streak >= 7], ['💯', '500 баллов', s.total >= 500], ['👑', '1000 баллов', s.total >= 1000],
+    ['🎖️', 'Первая смена', (S.ach || []).some((a) => a.code.startsWith('quest:'))], ['🔥', '3 дня подряд', s.streak >= 3], ['⚡', 'Неделя подряд', s.streak >= 7], ['💯', '500 баллов', s.total >= 500], ['👑', '1000 баллов', s.total >= 1000],
   ];
 }
 async function vMe() {
@@ -633,7 +698,7 @@ function codeModal(name, phone, code) {
 }
 
 async function vAdmin(tab, arg) {
-  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['shop', 'Магазин'], ['cast', 'Персонажи']];
+  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['quests', 'Квесты'], ['shop', 'Магазин'], ['cast', 'Персонажи']];
   const top = `<div class="stack"><div class="row between"><div class="h1">Кабинет</div>${conceptSwitch()}</div>
     <div class="atabs">${T.map(([k, n]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${n}</a>`).join('')}</div><div id="ab" class="stack"><div class="spin"></div></div></div>`;
   $app.innerHTML = top; bindConceptSwitch();
@@ -644,6 +709,7 @@ async function vAdmin(tab, arg) {
   if (tab === 'news') return aNews(ab);
   if (tab === 'cast') return aCast(ab);
   if (tab === 'shop') return aShop(ab);
+  if (tab === 'quests') return aQuests(ab, arg);
 }
 
 async function aStaff(ab) {
