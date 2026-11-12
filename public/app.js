@@ -10,7 +10,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Менеджер' };
-const REASON = { quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -143,6 +143,7 @@ async function route() {
     if (r === 'block') { tabs('learn'); return await vBlock(decodeURIComponent(p[1])); }
     if (r === 'lesson') { tabs('learn'); return await vLesson(decodeURIComponent(p[1])); }
     if (r === 'play') { tabs(p[2] ? 'learn' : 'home'); return await vPlay(p[1], p[2] ? decodeURIComponent(p[2]) : null); }
+    if (r === 'shop') { tabs('home'); return await vShop(p[1]); }
     if (r === 'games') { tabs('home'); return await vGames(); }
     if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx()); }
     if (r === 'book') { tabs('book'); return await vBook(p[1]); }
@@ -168,7 +169,7 @@ function topBar() {
   const L = level(S.stats.total);
   return `<div class="top"><a class="ava" href="#/me" style="--p:${L.pct}" aria-label="Профиль"><b>${esc(initials(S.me.full_name))}</b></a>
     <div class="who"><span class="small muted">${L.icon} ${L.name}</span><b>${esc(S.me.full_name.split(' ')[0])}</b></div>
-    <span class="chip fire" title="Дней подряд">🔥 ${S.stats.streak}</span><span class="chip gem" title="Баллы">⭐ ${S.stats.total}</span></div>`;
+    <span class="chip fire" title="Дней подряд">🔥 ${S.stats.streak}</span><a class="chip gem" href="#/shop" title="Баллы на счету">⭐ ${S.stats.balance ?? S.stats.total}</a></div>`;
 }
 async function vHome() {
   const s = S.stats, nb = nextBlock();
@@ -194,6 +195,7 @@ async function vHome() {
     ${hero}
     <div class="goal"><div class="ring" style="--p:${gp}"><span>${S.today}/${GOAL}</span></div>
       <div><b>${gp >= 100 ? 'Цель дня выполнена 🎉' : 'Цель дня — 30 баллов'}</b><span class="small muted">${gp >= 100 ? 'Серия продолжается. Завтра — новая цель' : 'Урок, квиз или блиц — и серия не прервётся'}</span></div></div>
+    <a class="shopban" href="#/shop"><span class="e">🎁</span><div><b>Магазин наград</b><small>На счету ⭐ ${s.balance ?? s.total} — обменяй на кофе или десерт</small></div><span class="go">›</span></a>
     ${s.due ? `<a class="tile hot" href="#/play/review" style="min-height:auto;flex-direction:row;align-items:center;gap:14px;justify-content:flex-start"><span class="e">🔁</span><div><b>Повторить ${s.due} ${plural(s.due, 'вопрос', 'вопроса', 'вопросов')}</b><div class="small muted">Освежи, пока не забылось</div></div></a>` : ''}
     <div class="sec-t"><span class="h2">Меню знаний</span><a href="#/learn">Все</a></div>
     <div class="plates">${S.blocks.map((b, i) => `<a class="plate" href="#/block/${encodeURIComponent(b.id)}"><div class="pl" style="--p:${pctOf(b.id)}"><div>${plateImg(b, i)}</div></div><b>${esc(b.title)}</b></a>`).join('')}</div>
@@ -237,6 +239,84 @@ function tour(force) {
   const close = () => { if (ch) ch.destroy(); o.remove(); const nb = nextBlock(); if (nb && !force) location.hash = '#/block/' + encodeURIComponent(nb.id); };
   draw();
   return true;
+}
+const OST = { new: ['Оформлен', 'acc'], ready: ['Можно забрать', 'ok'], issued: ['Выдан', ''], cancelled: ['Отменён, баллы вернулись', ''] };
+async function vShop(sub) {
+  const [{ data: items }, { data: orders }] = await Promise.all([
+    sb.from('rewards').select('*').eq('active', true).or(`concept.is.null,concept.eq.${S.concept}`).order('sort'),
+    sb.from('orders').select('*').eq('user_id', S.me.id).order('created_at', { ascending: false }).limit(30),
+  ]);
+  const bal = S.stats.balance ?? S.stats.total;
+  const ordersHtml = (orders || []).length ? orders.map((o) => `<div class="ord"><span class="e">${esc(o.icon || '🎁')}</span><div class="t"><b>${esc(o.title)}</b><small>${new Date(o.created_at).toLocaleDateString('ru-RU')} · ⭐ ${o.price}</small></div>
+      <div class="c">${o.status === 'new' || o.status === 'ready' ? `<span class="code4">${o.code}</span>` : ''}<span class="pill ${OST[o.status][1]}">${OST[o.status][0]}</span></div></div>`).join('') : '<p class="muted">Заказов пока нет.</p>';
+  if (sub === 'orders') {
+    $app.innerHTML = `<div class="stack"><div class="row"><a class="back" href="#/shop">‹</a><div class="h1">Мои заказы</div></div>
+      <p class="small muted">Покажите код сервис-менеджеру, когда заказ будет «Можно забрать».</p>${ordersHtml}</div>`;
+    return;
+  }
+  $app.innerHTML = h`<div class="stack">
+    <div class="row"><a class="back" href="#/home">‹</a><div class="h1">Магазин наград</div></div>
+    <div class="shophead"><div><small>На счету</small><b>⭐ ${bal}</b></div><div class="shop-ch" id="shch"></div></div>
+    <div class="rewards">${(items || []).map((r) => {
+      const can = bal >= r.price && (r.stock == null || r.stock > 0);
+      return `<div class="rw ${can ? '' : 'off'}"><span class="e">${esc(r.icon || '🎁')}</span><b>${esc(r.title)}</b>${r.descr ? `<small>${esc(r.descr)}</small>` : ''}
+        ${r.stock != null ? `<small class="muted">Осталось: ${r.stock}</small>` : ''}
+        <button class="btn sm ${can ? 'gold' : 'ghost'}" data-buy="${r.id}" ${can ? '' : 'disabled'}>⭐ ${r.price}</button>
+        ${!can && r.stock !== 0 ? `<small class="need">ещё ${r.price - bal}</small>` : ''}</div>`;
+    }).join('') || '<p class="muted">Призы скоро появятся.</p>'}</div>
+    <div class="sec-t"><span class="h2">Мои заказы</span><a href="#/shop/orders">Все</a></div>
+    ${(orders || []).slice(0, 3).length ? (orders || []).slice(0, 3).map((o) => `<div class="ord"><span class="e">${esc(o.icon || '🎁')}</span><div class="t"><b>${esc(o.title)}</b><small>${new Date(o.created_at).toLocaleDateString('ru-RU')}</small></div><div class="c">${o.status === 'new' || o.status === 'ready' ? `<span class="code4">${o.code}</span>` : ''}<span class="pill ${OST[o.status][1]}">${OST[o.status][0]}</span></div></div>`).join('') : '<p class="muted small">Заказов пока нет.</p>'}
+  </div>`;
+  const ch = new Character(document.getElementById('shch'), 'shefi', 'invite');
+  document.querySelectorAll('[data-buy]').forEach((b) => b.onclick = async () => {
+    const r = items.find((x) => x.id === +b.dataset.buy);
+    if (!(await ask(`Обменять ⭐ ${r.price} на «${r.title}»?`, 'Обменять'))) return;
+    b.disabled = true;
+    const { data, error } = await sb.rpc('buy_reward', { p_reward: r.id });
+    if (error || data.error) { toast(error ? 'Нет связи, попробуйте ещё раз' : data.error); ch.react('wrong'); b.disabled = false; return; }
+    await loadBase(); confetti();
+    coach({ concept: S.concept, center: true, mood: 'victory', text: `Готово! «${r.title}» твой. Код получения: ${data.code}. Покажи его сервис-менеджеру, когда заказ будет «Можно забрать».`, actions: [{ label: 'Отлично!', onClick: () => vShop() }] });
+  });
+}
+async function aShop(ab) {
+  const [{ data: items }, { data: orders }, { data: ppl }] = await Promise.all([
+    sb.from('rewards').select('*').order('sort'),
+    sb.from('orders').select('*').order('created_at', { ascending: false }).limit(200),
+    sb.from('profiles').select('id,full_name,restaurant_id'),
+  ]);
+  const who = (id) => (ppl || []).find((p) => p.id === id);
+  const open = (orders || []).filter((o) => o.status === 'new' || o.status === 'ready');
+  const done = (orders || []).filter((o) => !(o.status === 'new' || o.status === 'ready')).slice(0, 30);
+  const row = (o) => { const p = who(o.user_id); return `<tr><td><b>${esc(o.icon || '')} ${esc(o.title)}</b><div class="small muted">⭐ ${o.price} · ${new Date(o.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></td>
+    <td>${esc(p?.full_name || '—')}<div class="small muted">${esc(S.rests.find((r) => r.id === p?.restaurant_id)?.name || '')}</div></td><td><span class="code4">${o.code}</span></td>
+    <td><span class="pill ${OST[o.status][1]}">${OST[o.status][0]}</span>${o.status === 'new' || o.status === 'ready' ? `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">${o.status === 'new' ? `<button class="btn sm ghost" data-st="ready" data-o="${o.id}">Готов</button>` : ''}<button class="btn sm" data-st="issued" data-o="${o.id}">Выдан</button><button class="btn sm ghost" data-st="cancelled" data-o="${o.id}">Отменить</button></div>` : ''}</td></tr>`; };
+  ab.innerHTML = h`
+  <div class="row between"><b>Заказы к выдаче: ${open.length}</b><input id="codeq" placeholder="Найти по коду" style="max-width:180px" inputmode="numeric"></div>
+  <div class="tw"><table class="t"><tr><th>Приз</th><th>Сотрудник</th><th>Код</th><th>Статус</th></tr>${open.map(row).join('') || '<tr><td colspan="4" class="muted">Открытых заказов нет</td></tr>'}</table></div>
+  <details><summary class="small muted">Закрытые заказы (${done.length})</summary><div class="tw"><table class="t">${done.map(row).join('')}</table></div></details>
+  <div class="h2">Каталог призов</div>
+  <p class="small muted">Цены в баллах. Остаток пустой — без ограничений. Цены и призы — ваше решение, сейчас стоят примеры.</p>
+  <div class="tw"><table class="t"><tr><th>Значок</th><th>Приз</th><th>Цена</th><th>Остаток</th><th>Для</th><th>В магазине</th></tr>
+  ${(items || []).map((r) => `<tr data-r="${r.id}"><td><input value="${esc(r.icon || '')}" data-f="icon" style="width:58px"></td><td><input value="${esc(r.title)}" data-f="title"><input value="${esc(r.descr || '')}" data-f="descr" placeholder="Описание" style="margin-top:6px"></td>
+    <td><input type="number" value="${r.price}" data-f="price" style="width:90px"></td><td><input type="number" value="${r.stock ?? ''}" data-f="stock" style="width:80px"></td>
+    <td><select data-f="concept"><option value="">Все</option><option value="grano" ${r.concept === 'grano' ? 'selected' : ''}>GRANO</option><option value="vilka" ${r.concept === 'vilka' ? 'selected' : ''}>VILKA</option></select></td>
+    <td><label class="switch"><input type="checkbox" data-f="active" ${r.active ? 'checked' : ''}> да</label></td></tr>`).join('')}</table></div>
+  <form class="card stack" id="addr"><b>Добавить приз</b><div class="grid2"><input id="ni" placeholder="Значок, например 🍕" value="🎁"><input id="nt" placeholder="Название" required><input id="np" type="number" placeholder="Цена в баллах" required><input id="ns" type="number" placeholder="Остаток (необязательно)"></div><button class="btn">Добавить</button></form>`;
+  ab.querySelectorAll('[data-st]').forEach((b) => b.onclick = async () => {
+    if (b.dataset.st === 'cancelled' && !(await ask('Отменить заказ и вернуть баллы сотруднику?', 'Отменить', true))) return;
+    const { data, error } = await sb.rpc('set_order_status', { p_order: +b.dataset.o, p_status: b.dataset.st });
+    toast(error ? error.message : data.error || ({ ready: 'Отмечено: можно забрать', issued: 'Приз выдан', cancelled: 'Заказ отменён, баллы вернулись' })[b.dataset.st]); aShop(ab);
+  });
+  ab.querySelector('#codeq').oninput = (e) => { const v = e.target.value.trim(); ab.querySelectorAll('.tw table tr').forEach((tr) => { const c = tr.querySelector('.code4'); if (c) tr.style.display = !v || c.textContent.includes(v) ? '' : 'none'; }); };
+  ab.querySelectorAll('[data-r] [data-f]').forEach((inp) => inp.onchange = async () => {
+    const id = +inp.closest('[data-r]').dataset.r, f = inp.dataset.f;
+    let v = inp.type === 'checkbox' ? inp.checked : inp.value;
+    if (f === 'price') v = Math.max(1, parseInt(v) || 1); if (f === 'stock') v = v === '' ? null : Math.max(0, parseInt(v) || 0); if (f === 'concept') v = v || null;
+    const { error } = await sb.from('rewards').update({ [f]: v }).eq('id', id); toast(error ? error.message : 'Сохранено');
+  });
+  ab.querySelector('#addr').onsubmit = async (e) => { e.preventDefault();
+    const { error } = await sb.from('rewards').insert({ icon: ni.value || '🎁', title: nt.value, price: Math.max(1, parseInt(np.value) || 1), stock: ns.value === '' ? null : parseInt(ns.value), sort: (items || []).length + 1 });
+    toast(error ? error.message : 'Приз добавлен'); aShop(ab); };
 }
 async function vGames() {
   const vilka = S.concept === 'vilka';
@@ -523,7 +603,8 @@ async function vMe() {
     <div class="sec-t"><span class="h2">Награды</span></div>
     <div class="badges">${badges().map(([e, n, on]) => `<div class="bdg ${on ? '' : 'off'}"><div class="md">${e}</div><b>${n}</b></div>`).join('')}</div>
     <div class="sec-t"><span class="h2">История баллов</span></div>
-    <div>${(hist || []).length ? hist.map((x) => `<div class="hist"><div class="nm"><b>${REASON[x.reason] || x.reason}</b><div class="small muted">${new Date(x.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div><span class="pt">+${x.amount}</span></div>`).join('') : '<p class="muted">Баллов пока нет. Начни с первого урока.</p>'}</div>
+    <div>${(hist || []).length ? hist.map((x) => `<div class="hist"><div class="nm"><b>${REASON[x.reason] || x.reason}</b><div class="small muted">${new Date(x.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div></div><span class="pt" style="${x.amount < 0 ? 'color:var(--bad)' : ''}">${x.amount > 0 ? '+' : ''}${x.amount}</span></div>`).join('') : '<p class="muted">Баллов пока нет. Начни с первого урока.</p>'}</div>
+    <a class="btn ghost" href="#/shop/orders">🎁 Мои заказы</a>
     <button class="btn ghost" id="tourAgain">Знакомство с Шефи ещё раз</button>
     <button class="btn ghost" id="out">Выйти</button>
     <div class="sign">Вопросы по обучению: ${CONTACT.who}<br><b>${CONTACT.tel}</b></div>
@@ -552,7 +633,7 @@ function codeModal(name, phone, code) {
 }
 
 async function vAdmin(tab, arg) {
-  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['cast', 'Персонажи']];
+  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['shop', 'Магазин'], ['cast', 'Персонажи']];
   const top = `<div class="stack"><div class="row between"><div class="h1">Кабинет</div>${conceptSwitch()}</div>
     <div class="atabs">${T.map(([k, n]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${n}</a>`).join('')}</div><div id="ab" class="stack"><div class="spin"></div></div></div>`;
   $app.innerHTML = top; bindConceptSwitch();
@@ -562,6 +643,7 @@ async function vAdmin(tab, arg) {
   if (tab === 'progress') return aProgress(ab);
   if (tab === 'news') return aNews(ab);
   if (tab === 'cast') return aCast(ab);
+  if (tab === 'shop') return aShop(ab);
 }
 
 async function aStaff(ab) {

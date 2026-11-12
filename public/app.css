@@ -465,3 +465,19 @@ html[data-concept="grano"] .coach-name{color:#5e6b1f}
 .tour-card p{font-size:16.5px;line-height:1.45}
 .tour-dots{display:flex;gap:6px}.tour-dots i{width:8px;height:8px;border-radius:9px;background:var(--line);transition:width .2s}.tour-dots i.on{width:24px;background:var(--acc)}
 .tour .btn{margin-bottom:auto}
+
+/* ---------- reward shop ---------- */
+.shopban{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:22px;text-decoration:none;color:#fff;background:linear-gradient(135deg,#ff5f8f,#b83a7a);box-shadow:0 5px 0 rgba(0,0,0,.22)}
+.shopban .e{font-size:34px}.shopban b{display:block;font-family:var(--display);font-weight:var(--dw);font-size:17px}.shopban small{font-size:13px;opacity:.92}.shopban .go{margin-left:auto;font-size:24px}
+.shophead{position:relative;display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-radius:24px;background:var(--hero);color:#fff;min-height:120px;overflow:visible}
+.shophead small{opacity:.85;font-weight:700}.shophead b{display:block;font-family:var(--display);font-weight:900;font-size:40px;line-height:1}
+.shop-ch{width:110px;height:130px;margin:-30px -6px -18px 0}
+.rewards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.rw{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16px 12px;border-radius:22px;background:var(--card);border:1px solid var(--line)}
+.rw .e{font-size:46px;line-height:1.1}.rw b{font-size:15.5px;line-height:1.2}.rw small{font-size:12.5px;color:var(--muted)}
+.rw .btn{margin-top:auto;width:100%}.rw.off .e{filter:grayscale(.6);opacity:.7}.rw .need{color:var(--acc);font-weight:800}
+.ord{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:18px}
+.ord .e{font-size:30px}.ord .t{flex:1;min-width:0}.ord .t b{display:block}.ord .t small{color:var(--muted);font-size:12.5px}
+.ord .c{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.code4{font-family:"Unbounded",sans-serif;font-weight:800;font-size:18px;letter-spacing:.12em;color:var(--acc)}
+details summary{cursor:pointer;padding:6px 0}
