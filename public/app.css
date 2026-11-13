@@ -679,3 +679,4 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .mark.on.none{border-color:var(--bad)}.mark.on.none .ck{background:var(--bad);border-color:var(--bad)}
 .mark[disabled]{opacity:1;pointer-events:none}
 .s.self{position:relative}.s.self::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.imp{max-height:92dvh;overflow:auto}
