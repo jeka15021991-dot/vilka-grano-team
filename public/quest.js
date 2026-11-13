@@ -114,7 +114,7 @@ export async function vQuest(ctx, id) {
   const bot = document.getElementById('qbot');
   bot.innerHTML = `<button class="btn block gold" id="qgo">${next ? `Дальше: ${esc(next.zone)}` : 'Забрать награду'}</button>`;
   document.getElementById('qgo').onclick = async (e) => { e.target.disabled = true; const tgt = next || { id: '__finish', at: FINISH }; await walk(tgt.at); open(tgt); };
-  if (!done.size) { await sleep(300); m.react('invite'); await say(bub, `Привет, ${S.me.full_name.split(' ')[0]}! Сегодня твоя первая смена — пройдём ресторан вместе?`); }
+  if (!done.size) { await sleep(300); m.react('invite'); await say(bub, `Привет, ${S.me.full_name.split(' ')[0]}! ${q.hello || (/смен/i.test(q.title) ? 'Сегодня твоя первая смена — пройдём ресторан вместе?' : `Квест «${q.title}». Пройдём его вместе?`)}`); }
   else if (next) say(bub, `С возвращением! Дальше — ${next.zone.toLowerCase()}. Жми «Дальше».`);
   else { m.react('victory'); say(bub, 'Смена пройдена! Забирай награду на финише.'); }
 
