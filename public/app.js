@@ -7,6 +7,7 @@ import { vCompete, aCompete, compeSummary } from './compete.js';
 import { vShift } from './lead.js';
 import { importStaff } from './importer.js';
 import { aMaterials, videoEmbed } from './materials.js';
+import { mountDaily } from './daily.js';
 import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief, homeSummary, bindHomeSummary } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -16,7 +17,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Администратор' };
-const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -210,6 +211,7 @@ async function vHome() {
       <a class="b3 b3-play" href="#/games"><span class="e">🎮</span><b>Играть</b><small>квест, блиц</small></a>
       <a class="b3 b3-rate" href="#/rating"><span class="e">🏆</span><b>Рейтинг</b><small>${S.stats.month} за месяц</small></a>
     </div>
+    <div id="daily"></div>
     <div id="sumr"></div>
     <div id="brf"></div>
     <div id="asgn"></div>
@@ -231,6 +233,7 @@ async function vHome() {
   if (!tour()) greetDaily(nb);
   if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
+  mountDaily(ctx(), document.getElementById('daily'));
   if (!isAdmin()) homeSummary(ctx()).then((html) => { const el = document.getElementById('sumr'); if (el && html) { el.innerHTML = html; bindHomeSummary(ctx()); } });
   homeBrief(ctx()).then((html) => { const el = document.getElementById('brf'); if (el && html) el.innerHTML = html; });
   if (!isAdmin()) homeAssignments(ctx()).then((html) => { const el = document.getElementById('asgn'); if (el && html) { el.innerHTML = html; bindHomeAssignments(ctx()); } });

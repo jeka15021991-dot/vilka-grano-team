@@ -688,3 +688,16 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .sumcard{border-color:var(--acc)}.sumcard.rd{border-color:var(--line)}
 .mh{display:flex;gap:8px;align-items:center}.mh span{font-size:22px}.mh small{color:var(--muted);font-weight:700}
 .msgcard p,.sumcard p{font-size:15px;line-height:1.5}
+
+/* ---------- вопрос дня ---------- */
+.daily{background:var(--card);border:2px solid var(--acc2);border-radius:var(--r-lg);padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.daily.ok{border-color:var(--ok)}.daily.bad{border-color:var(--bad)}
+.dq-h{display:flex;gap:10px;align-items:center}.dq-ch{width:70px;height:82px;flex:none;margin:-6px 0 -8px -6px}
+.dq-h small{display:block;color:var(--acc2);font-weight:800;font-size:12.5px}.dq-h b{font-size:16.5px;line-height:1.3}
+.dq-ph{width:100%;max-height:220px;object-fit:cover;border-radius:14px}
+.dq-o{display:flex;flex-direction:column;gap:8px}
+.dq-o button{text-align:left;padding:12px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card2);font-weight:700;font-size:15px}
+.dq-o button.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 18%,var(--card2))}
+.dq-o button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--card2))}
+.dq-o button.dim{opacity:.5}.dq-o button[disabled]{color:var(--fg)}
+.dq-r{display:flex;flex-direction:column;gap:4px}.dq-r small{color:var(--muted)}
