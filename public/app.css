@@ -598,7 +598,8 @@ details summary{cursor:pointer;padding:6px 0}
 .subtabs a{flex:none;text-decoration:none;color:var(--muted);font-weight:800;font-size:14px;padding:9px 6px;border-bottom:3px solid transparent}
 .subtabs a.on{color:var(--fg);border-color:var(--acc)}
 .dash-h{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.rsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .rcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:10px}
 .rc-h{display:flex;justify-content:space-between;align-items:center}
 .ring.sm{width:52px;height:52px;text-decoration:none;color:var(--fg)}.ring.sm span{width:40px;height:40px;font-size:12px}

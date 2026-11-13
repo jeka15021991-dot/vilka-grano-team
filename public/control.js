@@ -30,7 +30,7 @@ export async function aDash(ctx, ab) {
   ab.innerHTML = `
   <div class="dash-h"><div><span class="small muted">Неделя ${ru(d.week_from)}–${ru(d.week_to)}</span><div class="h2">${S.concept === 'grano' ? 'GRANO' : 'VILKA'}: заходили ${sum.act} из ${sum.staff} сотрудников</div></div>
     <button class="btn sm" id="wr">📋 Отчёт за неделю</button></div>
-  <div class="rgrid">${R.map((r) => {
+  <div class="rsgrid">${R.map((r) => {
     const a = r.last_audit, rp = r.reports || { ok: 0, late: 0, none: 0 };
     return `<div class="rcard"><div class="rc-h"><b class="h2">${esc(short(r.name))}</b>
         <a class="ring sm ${tone(a?.score)}" style="--p:${a?.score ?? 0}" href="#/admin/control/audits" title="Последняя проверка"><span>${a ? a.score + '%' : '—'}</span></a></div>
@@ -39,11 +39,11 @@ export async function aDash(ctx, ab) {
       <a class="rrow" href="#/admin/control/reports"><span>Отчёты смен</span><span class="dots"><i class="ok">${rp.ok}</i><i class="mid">${rp.late}</i><i class="bad">${rp.none}</i></span></a>
       <a class="rrow" href="#/admin/control/tasks"><span>Задачи администраторам</span><b class="${r.overdue ? 'bad-t' : ''}">${r.open_tasks}${r.overdue ? ` · просрочено ${r.overdue}` : ''}</b></a></div>`;
   }).join('')}</div>
-  <div class="grid2">
+  <div class="dgrid">
     <div class="card stack"><b>💤 Не заходили 7+ дней</b>${(d.idle || []).length ? d.idle.slice(0, 12).map((p) => `<div class="li"><span>${esc(p.name)}</span><span class="small muted">${esc(short(rname(p.rest)))} · ${p.seen ? ru(p.seen) : 'ни разу'}</span></div>`).join('') : '<span class="small muted">Все на месте 👍</span>'}</div>
     <div class="card stack"><b>🎯 Где ошибаются чаще всего</b>${(d.weak || []).length ? d.weak.map((w) => `<a class="li" href="#/admin/questions/${encodeURIComponent(w.block_id)}"><span>${esc(w.question)}</span><span class="pill" style="color:var(--bad)">${w.pct}%</span></a>`).join('') + '<span class="small muted">Процент неверных ответов. Эти темы стоит разобрать на пятиминутке.</span>' : '<span class="small muted">Пока мало ответов для выводов.</span>'}</div>
   </div>
-  <div class="grid2">
+  <div class="dgrid">
     <a class="card rrow" href="#/admin/shop"><span>🎁 Заказы магазина ждут выдачи</span><b>${d.orders}</b></a>
     <div class="card stack"><b>🎂 Дни рождения в ближайшие 2 недели</b>${(d.bdays || []).length ? d.bdays.map((b) => `<span>${esc(b.name)} — ${b.md}</span>`).join('') : '<span class="small muted">Нет</span>'}</div>
   </div>`;
