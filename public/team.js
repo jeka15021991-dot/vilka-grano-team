@@ -147,7 +147,7 @@ function menu(p) {
   document.body.appendChild(m);
 }
 
-async function shrink(file) {
+export async function shrink(file) {
   const img = await createImageBitmap(file).catch(() => null);
   if (!img) throw new Error('Не удалось открыть фото');
   const k = Math.min(1, 1280 / Math.max(img.width, img.height));

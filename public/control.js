@@ -236,7 +236,7 @@ async function briefs(cb) {
   const row = (b) => `<div class="brief-r ${b.day === today ? 'now' : ''}"><div class="bd-d"><b>${new Date(b.day + 'T12:00').getDate()}</b><small>${new Date(b.day + 'T12:00').toLocaleDateString('ru-RU', { month: 'short', weekday: 'short' })}</small></div>
     <div class="bt"><b>${esc(b.title)}</b>${b.body ? `<small>${esc(b.body.slice(0, 120))}${b.body.length > 120 ? '…' : ''}</small>` : ''}<small class="muted">${b.concept ? b.concept.toUpperCase() : 'Обе команды'}</small></div>
     <div class="row" style="gap:4px"><button class="btn sm" data-bs="${b.id}">Отправить</button><button class="pm" data-be="${b.id}" aria-label="Изменить">✎</button></div></div>`;
-  cb.innerHTML = `<p class="small muted">Задайте тему заранее. Администратор получит ссылку на материал (без входа в приложение), а сотрудники увидят тему дня на главной.</p>
+  cb.innerHTML = `<div id="sums" class="stack"></div><p class="small muted">Задайте тему заранее. Администратор получит ссылку на материал (без входа в приложение), а сотрудники увидят тему дня на главной.</p>
     <button class="btn" id="bn">+ Тема пятиминутки</button>
     <div class="sec-t"><span class="h2">Ближайшие</span></div>${up.length ? up.map(row).join('') : '<p class="muted">Тем на ближайшие дни нет.</p>'}
     ${past.length ? `<details><summary class="small muted">Прошедшие (${past.length})</summary><div class="stack" style="gap:8px;margin-top:8px">${past.map(row).join('')}</div></details>` : ''}`;
@@ -255,6 +255,7 @@ async function briefs(cb) {
     };
     if (b) m.querySelector('#bdel').onclick = async () => { if (!(await C.ask('Удалить тему?', 'Удалить', true))) return; await C.sb.from('briefs').delete().eq('id', b.id); m.remove(); briefs(cb); };
   };
+  summaries(cb.querySelector('#sums'));
   cb.querySelector('#bn').onclick = () => edit(null);
   cb.querySelectorAll('[data-be]').forEach((x) => x.onclick = () => edit(list.find((b) => b.id === +x.dataset.be)));
   cb.querySelectorAll('[data-bs]').forEach((x) => x.onclick = () => {
@@ -327,7 +328,7 @@ async function setup(cb) {
 }
 
 /* ============ ЗАДАНИЯ СОТРУДНИКАМ ============ */
-const AK = { lesson: '📖 Изучить урок', test: '✅ Сдать тест', quest: '🗺️ Пройти квест', text: '📝 Своё задание' };
+const AK = { msg: '💬 Личное сообщение', lesson: '📖 Изучить урок', test: '✅ Сдать тест', quest: '🗺️ Пройти квест', text: '📝 Своё задание' };
 export async function aAssign(ctx, ab) {
   C = ctx; const { sb, S } = ctx;
   const [{ data: list }, { data: ppl }, { data: qs }] = await Promise.all([
@@ -335,7 +336,7 @@ export async function aAssign(ctx, ab) {
     sb.from('profiles').select('id,full_name,restaurant_id').eq('concept', S.concept).eq('role', 'staff').eq('active', true).order('full_name'),
     sb.from('quests').select('id,title').eq('concept', S.concept).eq('active', true)]);
   const who = (a) => a.user_id ? (ppl || []).find((p) => p.id === a.user_id)?.full_name || 'сотрудник' : a.restaurant_id ? rname(a.restaurant_id) : 'Все сотрудники ' + S.concept.toUpperCase();
-  ab.innerHTML = `<p class="muted">Сотрудник увидит задание на главной. Уроки, тесты и квесты отмечаются выполненными сами, своё задание сотрудник отмечает кнопкой «Сделано».</p>
+  ab.innerHTML = `<p class="muted">Сотрудник увидит это на главной. Личное сообщение — с кнопкой «Прочитал(а)», вы видите, кто прочитал. Уроки, тесты и квесты отмечаются выполненными сами, своё задание сотрудник отмечает кнопкой «Сделано».</p>
   <form class="card stack" id="sf"><b>Новое задание</b><div class="grid2">
     <select id="sw"><option value="">Все сотрудники ${S.concept.toUpperCase()}</option>${rests().map((r) => `<option value="r:${r.id}">Только ${esc(r.name)}</option>`).join('')}${(ppl || []).map((p) => `<option value="u:${p.id}">${esc(p.full_name)}</option>`).join('')}</select>
     <select id="sk">${Object.entries(AK).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
@@ -346,15 +347,17 @@ export async function aAssign(ctx, ab) {
   ${(list || []).map((a) => `<button class="arow" data-s="${a.id}"><span class="e">${AK[a.kind].split(' ')[0]}</span><span class="at"><b>${esc(a.title)}</b><small>${esc(who(a))}${a.due ? ' · до ' + ru(a.due) : ''}</small></span><span class="pill" data-p="${a.id}">…</span></button>`).join('') || '<p class="muted">Заданий пока нет.</p>'}`;
   const f = (id) => ab.querySelector('#' + id);
   const fillT = () => {
-    const k = f('sk').value; f('st').hidden = k === 'text'; f('sx').hidden = k !== 'text';
+    const k = f('sk').value, free = k === 'text' || k === 'msg'; f('st').hidden = free; f('sx').hidden = !free; f('sx').placeholder = k === 'msg' ? 'Коротко: о чём сообщение (например «Продажа десертов»)' : 'Название задания'; f('sn').placeholder = k === 'msg' ? 'Текст сообщения, например: «Увеличьте продажу десертов, предлагайте их каждому столу. И не забывайте улыбаться 🙂»' : 'Комментарий для сотрудника (необязательно)';
     f('st').innerHTML = k === 'quest' ? (qs || []).map((q) => `<option value="${q.id}">${esc(q.title)}</option>`).join('') : S.blocks.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join('');
   };
   f('sk').onchange = fillT; fillT();
   f('sf').onsubmit = async (e) => {
     e.preventDefault(); const k = f('sk').value, w = f('sw').value;
-    const title = k === 'text' ? f('sx').value.trim() : `${AK[k].slice(3)}: ${f('st').selectedOptions[0]?.textContent || ''}`;
-    if (!title || (k === 'text' && !f('sx').value.trim())) return C.toast('Напишите название задания');
-    const { error } = await sb.from('assignments').insert({ concept: S.concept, kind: k, target: k === 'text' ? null : f('st').value, title, note: f('sn').value.trim() || null, due: f('sd').value || null,
+    const free = k === 'text' || k === 'msg';
+    if (k === 'msg' && !f('sn').value.trim()) return C.toast('Напишите текст сообщения');
+    const title = free ? f('sx').value.trim() || (k === 'msg' ? 'Сообщение от сервис-менеджера' : '') : `${AK[k].slice(3)}: ${f('st').selectedOptions[0]?.textContent || ''}`;
+    if (!title) return C.toast('Напишите название задания');
+    const { error } = await sb.from('assignments').insert({ concept: S.concept, kind: k, target: free ? null : f('st').value, title, note: f('sn').value.trim() || null, due: f('sd').value || null,
       restaurant_id: w.startsWith('r:') ? w.slice(2) : null, user_id: w.startsWith('u:') ? w.slice(2) : null });
     C.toast(error ? error.message : 'Задание отправлено'); if (!error) aAssign(ctx, ab);
   };
@@ -364,7 +367,7 @@ export async function aAssign(ctx, ab) {
   ab.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => {
     const a = list.find((x) => x.id === +b.dataset.s), d = a._st || [];
     const m = modal(`<div class="row between"><b class="h2">${esc(a.title)}</b><button class="pm" data-x>✕</button></div>${a.note ? `<p class="small">${esc(a.note)}</p>` : ''}
-      ${d.map((x) => `<div class="li"><span>${esc(x.name)} <span class="small muted">${esc(short(rname(x.rest)))}</span></span><span class="pill ${x.done ? 'ok' : ''}">${x.done ? 'Выполнено' : 'Ещё нет'}</span></div>`).join('') || '<span class="muted">Нет сотрудников</span>'}
+      ${d.map((x) => `<div class="li"><span>${esc(x.name)} <span class="small muted">${esc(short(rname(x.rest)))}</span></span><span class="pill ${x.done ? 'ok' : ''}">${x.done ? (a.kind === 'msg' ? 'Прочитано' : 'Выполнено') : (a.kind === 'msg' ? 'Не прочитано' : 'Ещё нет')}</span></div>`).join('') || '<span class="muted">Нет сотрудников</span>'}
       <button class="btn ghost" id="adel" style="color:var(--bad)">Удалить задание</button>`, 'wide-m');
     m.querySelector('#adel').onclick = async () => { if (!(await C.ask('Удалить задание?', 'Удалить', true))) return; await sb.from('assignments').delete().eq('id', a.id); m.remove(); aAssign(ctx, ab); };
   });
@@ -373,10 +376,12 @@ export async function aAssign(ctx, ab) {
 /* ============ задания на главной у сотрудника ============ */
 export async function homeAssignments(ctx) {
   const { data } = await ctx.sb.rpc('my_assignments');
-  const open = (data || []).filter((a) => !a.done);
-  if (!open.length) return '';
+  const all = (data || []).filter((a) => !a.done);
+  const msgs = all.filter((a) => a.kind === 'msg'), open = all.filter((a) => a.kind !== 'msg');
+  const mhtml = msgs.map((a) => `<div class="msgcard"><div class="mh"><span>💬</span><small>Сообщение от сервис-менеджера</small></div><b>${esc(a.title)}</b>${a.note ? `<p>${esc(a.note).replace(/\n/g, '<br>')}</p>` : ''}<button class="btn sm" data-asd="${a.id}">Прочитал(а) 👍</button></div>`).join('');
+  if (!open.length) return mhtml;
   const link = (a) => a.kind === 'quest' ? `#/quest/${encodeURIComponent(a.target)}` : a.kind === 'text' ? '' : `#/block/${encodeURIComponent(a.target)}`;
-  return `<div class="assign"><div class="as-h"><span>📌</span><b>Задания от сервис-менеджера</b></div>
+  return mhtml + `<div class="assign"><div class="as-h"><span>📌</span><b>Задания от сервис-менеджера</b></div>
     ${open.map((a) => { const late = a.due && a.due < ymd(new Date()); return `<div class="as-i ${late ? 'late' : ''}"><div><b>${esc(a.title)}</b>${a.note ? `<small>${esc(a.note)}</small>` : ''}${a.due ? `<small class="due">${late ? 'Срок прошёл' : 'Срок'}: ${ru(a.due)}</small>` : ''}</div>
       ${link(a) ? `<a class="btn sm" href="${link(a)}">Начать</a>` : `<button class="btn sm" data-asd="${a.id}">Сделано</button>`}</div>`; }).join('')}</div>`;
 }
@@ -384,6 +389,7 @@ export function bindHomeAssignments(ctx) {
   document.querySelectorAll('[data-asd]').forEach((b) => b.onclick = async () => {
     b.disabled = true; const { error } = await ctx.sb.from('assignment_done').insert({ assignment_id: +b.dataset.asd, user_id: ctx.S.me.id });
     if (error) { ctx.toast(error.message); b.disabled = false; return; }
+    const card = b.closest('.msgcard'); if (card) { card.remove(); ctx.toast('Отлично!'); return; }
     ctx.confetti(); b.closest('.as-i').remove(); if (!document.querySelector('.as-i')) document.querySelector('.assign')?.remove();
   });
 }
@@ -402,4 +408,37 @@ export async function publicBrief(sb, token, $app) {
       <h1 class="h1">${esc(b.title)}</h1>${b.body ? `<div class="pub-b">${esc(b.body).replace(/\n/g, '<br>')}</div>` : ''}
       <div class="sign">Материал подготовила: ${SIGN}</div></article>`
     : '<div class="card stack"><b>Материал не найден</b><p class="muted">Ссылка устарела. Запросите новую у сервис-менеджера.</p></div>';
+}
+
+/* ============ итоги пятиминутки ============ */
+export async function homeSummary(ctx) {
+  const { data } = await ctx.sb.rpc('summary_today');
+  const list = (data || []);
+  if (!list.length) return '';
+  return list.map((x) => `<div class="sumcard ${x.read ? 'rd' : ''}"><div class="mh"><span>📝</span><small>Итоги пятиминутки · ${esc(x.author || 'администратор')}</small></div>
+    <p>${esc(x.body).replace(/\n/g, '<br>')}</p>${x.read ? '<span class="small muted">✓ Вы ознакомились</span>' : `<button class="btn sm" data-sum="${x.id}">Ознакомлен(а)</button>`}</div>`).join('');
+}
+export function bindHomeSummary(ctx) {
+  document.querySelectorAll('[data-sum]').forEach((b) => b.onclick = async () => {
+    b.disabled = true; const { error } = await ctx.sb.rpc('summary_read', { p_id: +b.dataset.sum });
+    if (error) { ctx.toast(error.message); b.disabled = false; return; }
+    b.outerHTML = '<span class="small muted">✓ Вы ознакомились</span>'; ctx.toast('Отмечено');
+  });
+}
+async function summaries(box) {
+  const { data } = await C.sb.rpc('summary_stats', { p_concept: C.S.concept });
+  const by = {}; (data || []).forEach((x) => (by[x.rest || ''] = x));
+  box.innerHTML = `<div class="sec-t"><span class="h2">Итоги пятиминутки сегодня</span></div>
+    <p class="small muted">Пишет администратор во вкладке «Смена» или вы здесь. Итоги закрепляются у сотрудников точки на главной до конца дня, у каждого кнопка «Ознакомлен(а)».</p>
+    ${rests().map((r) => { const x = by[r.id]; const st = x?.staff || [], rd = st.filter((p) => p.read);
+      return `<div class="card stack"><div class="row between"><b>${esc(r.name)}</b>${x ? `<span class="pill ${rd.length === st.length && st.length ? 'ok' : ''}">прочитали ${rd.length} из ${st.length}</span>` : '<span class="pill">нет итогов</span>'}</div>
+        ${x ? `<p class="small">${esc(x.body).replace(/\n/g, '<br>')}</p><span class="small muted">${esc(x.author || '')} · ${new Date(x.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+          ${st.length - rd.length ? `<details><summary class="small muted">Не прочитали (${st.length - rd.length})</summary><div class="small">${st.filter((p) => !p.read).map((p) => esc(p.name)).join(', ')}</div></details>` : ''}` : ''}
+        <button class="btn sm ghost" data-sw="${r.id}">${x ? 'Изменить' : 'Написать итоги'}</button></div>`; }).join('')}`;
+  box.querySelectorAll('[data-sw]').forEach((b) => b.onclick = () => {
+    const x = by[b.dataset.sw];
+    const m = modal(`<div class="row between"><b class="h2">Итоги пятиминутки</b><button class="pm" data-x>✕</button></div><span class="small muted">${esc(rname(b.dataset.sw))} · сегодня</span>
+      <textarea id="sb" rows="8" placeholder="Сегодня: …\nПодытожим: …">${esc(x?.body || '')}</textarea><button class="btn" id="ss">Опубликовать</button>`, 'wide-m');
+    m.querySelector('#ss').onclick = async () => { const { error } = await C.sb.rpc('summary_save', { p_rest: b.dataset.sw, p_body: m.querySelector('#sb').value }); if (error) return C.toast(error.message); m.remove(); summaries(box); };
+  });
 }

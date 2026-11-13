@@ -6,7 +6,8 @@ import { vTeam, feedUnread } from './team.js';
 import { vCompete, aCompete, compeSummary } from './compete.js';
 import { vShift } from './lead.js';
 import { importStaff } from './importer.js';
-import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief } from './control.js';
+import { aMaterials, videoEmbed } from './materials.js';
+import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief, homeSummary, bindHomeSummary } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
 const SB_KEY = 'sb_publishable_pkhdRyL8FhjAHaKgXmuh6Q_Oi0zlZ9S';
@@ -120,7 +121,8 @@ async function loadBase() {
     sb.from('kb_cards').select('block_id,photo,sort').eq('concept', S.concept).not('photo', 'is', null).order('sort'),
     sb.from('points_ledger').select('amount').eq('user_id', S.me.id).gte('created_at', t0.toISOString()),
   ]);
-  S.blocks = b.data || []; S.stats = st.data || { total: 0, month: 0, streak: 0, due: 0, blocks: {}, questions: {} };
+  S.blocks = (b.data || []).filter((x) => isAdmin() || !x.custom || ((!x.positions?.length || x.positions.includes(S.me.position)) && (!x.restaurant_id || x.restaurant_id === S.me.restaurant_id)));
+  S.blocks.sort((a, z) => (z.custom && isNew(z) ? 1 : 0) - (a.custom && isNew(a) ? 1 : 0)); S.stats = st.data || { total: 0, month: 0, streak: 0, due: 0, blocks: {}, questions: {} };
   S.covers = {}; S.blocks.forEach((x) => { if (x.cover) S.covers[x.id] = x.cover; });
   (cv.data || []).forEach((c) => { if (!S.covers[c.block_id]) S.covers[c.block_id] = c.photo; });
   S.today = (td.data || []).reduce((a, x) => a + x.amount, 0);
@@ -172,6 +174,7 @@ async function route() {
 
 /* ---------------- home ---------------- */
 const GOAL = 30;
+function isNew(b) { return b.custom && b.created_at && Date.now() - new Date(b.created_at) < 14 * 864e5; }
 const initials = (n) => String(n || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 const pctOf = (id) => { const s = S.stats.blocks[id] || {}; return (s.lesson ? 34 : 0) + ((s.quiz || 0) >= 60 ? 33 : 0) + (s.passed ? 33 : 0); };
 const EMO = ['🍽️', '🥩', '🍔', '🥗', '🍲', '🍕', '🍝', '🧀', '🍰', '🍺', '🍹', '☕'];
@@ -207,6 +210,7 @@ async function vHome() {
       <a class="b3 b3-play" href="#/games"><span class="e">🎮</span><b>Играть</b><small>квест, блиц</small></a>
       <a class="b3 b3-rate" href="#/rating"><span class="e">🏆</span><b>Рейтинг</b><small>${S.stats.month} за месяц</small></a>
     </div>
+    <div id="sumr"></div>
     <div id="brf"></div>
     <div id="asgn"></div>
     ${S.mainQuest && S.quest.size < S.mainQuest.steps.length ? questCard(S.mainQuest, S.quest) : ''}
@@ -227,6 +231,7 @@ async function vHome() {
   if (!tour()) greetDaily(nb);
   if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
+  if (!isAdmin()) homeSummary(ctx()).then((html) => { const el = document.getElementById('sumr'); if (el && html) { el.innerHTML = html; bindHomeSummary(ctx()); } });
   homeBrief(ctx()).then((html) => { const el = document.getElementById('brf'); if (el && html) el.innerHTML = html; });
   if (!isAdmin()) homeAssignments(ctx()).then((html) => { const el = document.getElementById('asgn'); if (el && html) { el.innerHTML = html; bindHomeAssignments(ctx()); } });
   compeSummary(sb, S.concept).then((x) => { const el = document.getElementById('compBan'); if (!x || !el) return;
@@ -471,7 +476,7 @@ async function vLearn() {
       const s = st[b.id] || {}, nq = S.stats.questions[b.id] || 0;
       const cls = s.passed ? 'done' : (cur && cur.id === b.id ? 'cur' : (!nq && !s.lesson ? 'lock' : ''));
       return `<a class="node ${cls}" href="#/block/${encodeURIComponent(b.id)}"><div class="pl" style="--p:${pctOf(b.id)}"><div>${plateImg(b, i)}</div></div>
-        <div class="tx"><b>${esc(b.title)}</b><span>${s.passed ? `Сдан на ${s.test}%` : stepText(b.id)}</span>${cls === 'cur' ? '<br><span class="go">Сейчас</span>' : ''}</div></a>`;
+        <div class="tx"><b>${isNew(b) && !s.passed ? '<span class="newb">Новое</span> ' : ''}${esc(b.title)}</b><span>${s.passed ? `Сдан на ${s.test}%` : stepText(b.id)}</span>${cls === 'cur' ? '<br><span class="go">Сейчас</span>' : ''}</div></a>`;
     }).join('')}
     </div>
   </div>`;
@@ -489,11 +494,11 @@ async function vBlock(id) {
   <div class="cover">${S.covers[id] ? `<img src="${esc(S.covers[id])}" alt="">` : ''}<a class="back" href="#/learn">‹</a>
     <span class="small" style="opacity:.9">${nq ? `${nq} ${plural(nq, 'вопрос', 'вопроса', 'вопросов')} · ${pctOf(id)}% пройдено` : 'Урок по книге'}</span><span class="t">${esc(b.title)}</span></div>
   <div class="steps">
-    ${step(1, '📖', 'Урок', 'Карточки блюд раздела', `#/lesson/${encodeURIComponent(id)}`, s.lesson, false, s.lesson ? 'Изучен' : '+10')}
+    ${step(1, '📖', 'Урок', b.custom ? 'Материал от сервис-менеджера' : 'Карточки блюд раздела', `#/lesson/${encodeURIComponent(id)}`, s.lesson, false, s.lesson ? 'Изучен' : '+10')}
     ${nq ? step(2, '🎯', 'Квиз', '5 вопросов на закрепление', `#/play/quiz/${encodeURIComponent(id)}`, quizOk, false, quizOk ? `${s.quiz}%` : '+10') : ''}
     ${nq ? step(3, '🏆', 'Тест', 'До 10 вопросов, сдан от 80%', `#/play/test/${encodeURIComponent(id)}`, s.passed, !quizOk, s.passed ? `${s.test}%` : quizOk ? '+50' : '🔒') : ''}
     ${nq ? step(4, '⚡', 'Блиц по разделу', '60 секунд, сколько успеешь', `#/play/speed/${encodeURIComponent(id)}`, false, false, '') : ''}
-    <a class="step" href="#/book/${encodeURIComponent(b.section_id)}"><div class="ic">📚</div><div class="tx"><b>Открыть в книге</b><span class="small muted">Весь раздел с фото и подсказками</span></div></a>
+    ${b.custom ? '' : `<a class="step" href="#/book/${encodeURIComponent(b.section_id)}"><div class="ic">📚</div><div class="tx"><b>Открыть в книге</b><span class="small muted">Весь раздел с фото и подсказками</span></div></a>`}
   </div>`;
 }
 
@@ -519,7 +524,8 @@ async function vLesson(id) {
       <div class="lcard">${c.photo ? `<img src="${esc(c.photo)}" alt="">` : ''}<div class="in">
         ${c.group_title ? `<span class="lbl">${esc(c.group_title)}</span>` : ''}
         <div class="nm">${esc(c.name)}</div>
-        ${c.descr ? `<p>${esc(c.descr)}</p>` : ''}
+        ${c.descr ? `<p>${esc(c.descr).replace(/\n/g, '<br>')}</p>` : ''}
+        ${c.video ? videoEmbed(c.video) : ''}
         ${c.comp ? `<div class="comp"><span class="lbl">Состав</span>${esc(c.comp)}</div>` : ''}
       </div></div>
       <div class="row"><button class="btn ghost" id="pv" ${i ? '' : 'disabled'} style="flex:1">Назад</button><button class="btn" id="nx" style="flex:2">${i + 1 < cards.length ? 'Дальше' : 'Урок изучен · +10'}</button></div>
@@ -725,7 +731,7 @@ const AGROUPS = [
   ['dash', 'Сводка', [['dash', 'Сводка']]],
   ['control', 'SERVICE CONTROL', [['control', 'SERVICE CONTROL']]],
   ['team', 'Команда', [['staff', 'Сотрудники'], ['progress', 'Прогресс']]],
-  ['learn', 'Обучение', [['assign', 'Задания сотрудникам'], ['questions', 'Вопросы'], ['quests', 'Квесты и симуляторы']]],
+  ['learn', 'Обучение', [['materials', 'Мои материалы'], ['assign', 'Задания и сообщения'], ['questions', 'Вопросы'], ['quests', 'Квесты и симуляторы']]],
   ['fun', 'Вовлечение', [['compete', 'Соревнования'], ['news', 'Новости'], ['shop', 'Магазин'], ['cast', 'Шефи']]],
 ];
 async function vAdmin(tab, arg) {
@@ -739,6 +745,7 @@ async function vAdmin(tab, arg) {
   if (tab === 'dash') return aDash(ctx(), ab);
   if (tab === 'control') return aControl(ctx(), ab, arg);
   if (tab === 'assign') return aAssign(ctx(), ab);
+  if (tab === 'materials') return aMaterials(ctx(), ab);
   if (tab === 'staff') return aStaff(ab);
   if (tab === 'questions') return aQuestions(ab, arg);
   if (tab === 'progress') return aProgress(ab);

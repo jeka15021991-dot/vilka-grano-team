@@ -19,6 +19,7 @@ export async function vShift(ctx) {
     <div><span class="small muted" style="text-transform:capitalize">${today}</span><div class="h1">Смена · ${esc(String(d.rest || '').replace(/^VILKA\s+/, ''))}</div></div>
     ${d.brief ? `<details class="brief-home" open><summary><span class="e">📣</span><div><small>Тема пятиминутки сегодня</small><b>${esc(d.brief.title)}</b></div></summary>${d.brief.body ? `<div class="bb">${esc(d.brief.body).replace(/\n/g, '<br>')}</div>` : ''}</details>`
       : '<div class="card small muted">На сегодня тема пятиминутки не задана — проведите её по текущим задачам смены.</div>'}
+    <div class="card stack" id="lsum"><b>📝 Итоги пятиминутки</b><span class="small muted">Напишите кратко после пятиминутки — итоги появятся у ваших сотрудников на главной, каждый нажмёт «Ознакомлен(а)».</span><div class="spin" style="width:22px;height:22px"></div></div>
     <div class="sec-t"><span class="h2">Отметки дня</span></div>
     <div class="marks">${slots.map(([k, e, t, sub]) => { const m = d.marks[k]; const byAdmin = m && m.source === 'admin';
       return `<button class="mark ${m ? 'on ' + m.status : ''}" data-m="${k}" ${byAdmin ? 'disabled' : ''}><span class="e">${e}</span><span class="mt"><b>${t}</b><small>${m ? (byAdmin ? 'Отметил сервис-менеджер: ' + ST[m.status] : 'Отмечено в ' + hm(m.at)) : sub}</small></span><span class="ck">${m ? '✓' : ''}</span></button>`; }).join('')}</div>
@@ -37,6 +38,12 @@ export async function vShift(ctx) {
         ${bad.length ? `<div class="stack" style="gap:6px;margin-top:10px">${bad.map((b) => `<div class="bad-it"><span>✕ ${esc(b)}</span></div>`).join('')}</div>` : ''}${a.comment ? `<p class="small" style="margin-top:8px">${esc(a.comment)}</p>` : ''}</details>`; }).join('')}` : ''}
     <div class="sign">Вопросы — Евгения Борисовна, сервис-менеджер<br><b>8 777 521 89 09</b></div>
   </div>`;
+  sb.rpc('lead_summary').then(({ data: sm }) => {
+    const box = $app.querySelector('#lsum'); if (!box) return;
+    box.querySelector('.spin').outerHTML = `<textarea id="lst" rows="5" placeholder="Сегодня: …&#10;Подытожим: …">${esc(sm?.body || '')}</textarea>
+      <div class="row between"><span class="small muted">${sm ? `Ознакомились: ${sm.reads} из ${sm.staff}` : ''}</span><button class="btn sm" id="lss">${sm ? 'Обновить' : 'Опубликовать'}</button></div>`;
+    box.querySelector('#lss').onclick = async () => { const { error: e } = await sb.rpc('summary_save', { p_rest: null, p_body: box.querySelector('#lst').value }); toast(e ? e.message : 'Итоги опубликованы'); if (!e) vShift(ctx); };
+  });
   $app.querySelectorAll('[data-m]').forEach((b) => b.onclick = async () => {
     const on = !b.classList.contains('on'); b.disabled = true;
     const { error: e } = await sb.rpc('lead_mark', { p_slot: b.dataset.m, p_done: on });

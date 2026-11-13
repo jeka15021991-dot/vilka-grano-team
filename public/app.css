@@ -680,3 +680,11 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .mark[disabled]{opacity:1;pointer-events:none}
 .s.self{position:relative}.s.self::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
 .imp{max-height:92dvh;overflow:auto}
+
+/* ---------- материалы, сообщения, итоги ---------- */
+.newb{display:inline-block;font-size:11px;font-weight:900;color:#fff;background:var(--bad);border-radius:8px;padding:2px 7px;vertical-align:middle}
+.vid{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;margin-top:8px}.vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.msgcard,.sumcard{background:var(--card);border:2px solid var(--acc2);border-radius:var(--r-lg);padding:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.sumcard{border-color:var(--acc)}.sumcard.rd{border-color:var(--line)}
+.mh{display:flex;gap:8px;align-items:center}.mh span{font-size:22px}.mh small{color:var(--muted);font-weight:700}
+.msgcard p,.sumcard p{font-size:15px;line-height:1.5}
