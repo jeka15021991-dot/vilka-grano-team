@@ -701,3 +701,21 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .dq-o button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--card2))}
 .dq-o button.dim{opacity:.5}.dq-o button[disabled]{color:var(--fg)}
 .dq-r{display:flex;flex-direction:column;gap:4px}.dq-r small{color:var(--muted)}
+
+/* ---------- игры на фото ---------- */
+.game-b{display:flex;flex-direction:column;gap:12px}
+.gb-dish{position:relative;border-radius:var(--r-lg);overflow:hidden;aspect-ratio:4/3;background:var(--card2)}
+.gb-dish img{width:100%;height:100%;object-fit:cover}
+.gb-plate{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:linear-gradient(transparent,rgba(0,0,0,.65))}
+.gb-plate span{background:var(--acc2);color:#1a1205;font-weight:800;font-size:13px;border-radius:99px;padding:5px 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip-i{border:2px solid var(--line);background:var(--card);border-radius:99px;padding:9px 14px;font-weight:700;font-size:14px}
+.chip-i.on{border-color:var(--acc2);background:color-mix(in srgb,var(--acc2) 20%,var(--card))}
+.chip-i.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 18%,var(--card))}.chip-i.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,var(--card));text-decoration:line-through}
+.spot{position:relative;border-radius:var(--r-md);overflow:hidden;cursor:crosshair;line-height:0}.spot img{width:100%;display:block}
+.spot .tap{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
+.spot .tap.hit{background:var(--ok)}.spot .tap.miss{background:var(--bad)}
+.spot .ans{position:absolute;transform:translate(-50%,-50%);aspect-ratio:1;height:auto!important;border-radius:50%;border:4px solid var(--acc2);box-shadow:0 0 0 999px rgba(0,0,0,.35);pointer-events:none}
+.spot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.spot-it{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:10px}.spot-it.off{opacity:.5}
+.game.g-build{border-color:var(--acc2)}.game.g-spot{border-color:var(--acc)}

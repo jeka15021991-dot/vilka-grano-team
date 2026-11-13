@@ -8,6 +8,7 @@ import { vShift } from './lead.js';
 import { importStaff } from './importer.js';
 import { aMaterials, videoEmbed } from './materials.js';
 import { mountDaily } from './daily.js';
+import { vBuild, vSpot, aSpot } from './games.js';
 import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief, homeSummary, bindHomeSummary } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -17,7 +18,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Администратор' };
-const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', game_build: 'Игра «Собери блюдо»', game_spot: 'Игра «Найди ошибку»', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -160,6 +161,7 @@ async function route() {
     if (r === 'play') { tabs(p[2] ? 'learn' : 'home'); return await vPlay(p[1], p[2] ? decodeURIComponent(p[2]) : null); }
     if (r === 'shop') { tabs('home'); return await vShop(p[1]); }
     if (r === 'games') { tabs('home'); return await vGames(); }
+    if (r === 'game') { $tabs.hidden = true; return await (p[1]?.startsWith('spot') ? vSpot(ctx()) : vBuild(ctx())); }
     if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx(), p[1] ? decodeURIComponent(p[1]) : S.mainQuest?.id); }
     if (r === 'sim') { $tabs.hidden = true; return await vSim(ctx(), decodeURIComponent(p[1])); }
     if (r === 'book') { tabs('book'); return await vBook(p[1]); }
@@ -422,8 +424,8 @@ async function vGames() {
     <div class="sec-t"><span class="h2">Игры</span></div>
     <a class="game g-speed" href="#/play/speed"><span class="e">⚡</span><div><b>Блиц 60 секунд</b><small>Сколько верных ответов успеешь? До 15 баллов в день</small></div><span class="go">›</span></a>
     <a class="game g-rev" href="#/play/review"><span class="e">🔁</span><div><b>Повторение</b><small>${S.stats.due ? `${S.stats.due} ${plural(S.stats.due, 'вопрос ждёт', 'вопроса ждут', 'вопросов ждут')} повторения` : 'Сейчас повторять нечего'}</small></div><span class="go">›</span></a>
-    <div class="game soon"><span class="e">🍔</span><div><b>Собери блюдо по слоям</b><small>Скоро для всех блюд меню</small></div></div>
-    <div class="game soon"><span class="e">🔍</span><div><b>Найди ошибку на фото</b><small>Скоро: сервировка и подача</small></div></div>
+    <a class="game g-build" href="#/game/build"><span class="e">🍔</span><div><b>Собери блюдо</b><small>Фото блюда — выбери, что в нём есть. До 10 баллов в день</small></div><span class="go">›</span></a>
+    <a class="game g-spot" href="#/game/spot"><span class="e">🔍</span><div><b>Найди ошибку на фото</b><small>Подача и сервировка: где ошибка? До 10 баллов в день</small></div><span class="go">›</span></a>
   </div>`;
   document.querySelectorAll('.qx-m').forEach((el) => new Character(el, 'shefi', 'invite').react('invite'));
 }
@@ -734,7 +736,7 @@ const AGROUPS = [
   ['dash', 'Сводка', [['dash', 'Сводка']]],
   ['control', 'SERVICE CONTROL', [['control', 'SERVICE CONTROL']]],
   ['team', 'Команда', [['staff', 'Сотрудники'], ['progress', 'Прогресс']]],
-  ['learn', 'Обучение', [['materials', 'Мои материалы'], ['assign', 'Задания и сообщения'], ['questions', 'Вопросы'], ['quests', 'Квесты и симуляторы']]],
+  ['learn', 'Обучение', [['materials', 'Мои материалы'], ['assign', 'Задания и сообщения'], ['spot', 'Игра «Найди ошибку»'], ['questions', 'Вопросы'], ['quests', 'Квесты и симуляторы']]],
   ['fun', 'Вовлечение', [['compete', 'Соревнования'], ['news', 'Новости'], ['shop', 'Магазин'], ['cast', 'Шефи']]],
 ];
 async function vAdmin(tab, arg) {
@@ -749,6 +751,7 @@ async function vAdmin(tab, arg) {
   if (tab === 'control') return aControl(ctx(), ab, arg);
   if (tab === 'assign') return aAssign(ctx(), ab);
   if (tab === 'materials') return aMaterials(ctx(), ab);
+  if (tab === 'spot') return aSpot(ctx(), ab);
   if (tab === 'staff') return aStaff(ab);
   if (tab === 'questions') return aQuestions(ab, arg);
   if (tab === 'progress') return aProgress(ab);
