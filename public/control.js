@@ -176,12 +176,12 @@ async function reports(cb) {
   const [{ data }, { data: mc }, mg] = await Promise.all([
     C.sb.from('shift_reports').select('*').in('restaurant_id', ids).gte('day', ymd(days[0])).lte('day', ymd(days[6])),
     C.sb.from('monthly_checks').select('*').in('restaurant_id', ids).eq('month', mS), loadMgrs()]);
-  const M = {}; (data || []).forEach((x) => (M[`${x.restaurant_id}|${x.day}|${x.slot}`] = x.status));
+  const M = {}, SRC = {}; (data || []).forEach((x) => { const k = `${x.restaurant_id}|${x.day}|${x.slot}`; M[k] = x.status; if (x.source === 'lead') SRC[k] = x.at; });
   const MC = {}; (mc || []).forEach((x) => (MC[`${x.restaurant_id}|${x.kind}|${x.manager_id || 0}`] = x));
   const today = ymd(new Date());
-  const cell = (r, d, s, l, tt) => { const v = M[`${r}|${d}|${s}`]; return `<button class="s ${v || ''}" data-r="${r}" data-d="${d}" data-s="${s}" title="${tt}${v ? ': ' + ST[v] : ''}">${l}</button>`; };
+  const cell = (r, d, s, l, tt) => { const k = `${r}|${d}|${s}`, v = M[k], self = SRC[k]; return `<button class="s ${v || ''} ${self ? 'self' : ''}" data-r="${r}" data-d="${d}" data-s="${s}" title="${tt}${v ? ': ' + ST[v] : ''}${self ? ' · отметил администратор в ' + new Date(self).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}">${l}</button>`; };
   const mbtn = (r, kind, mid, label) => { const x = MC[`${r}|${kind}|${mid || 0}`]; return `<button class="mchk ${x?.status || ''}" data-mr="${r}" data-mk="${kind}" data-mm="${mid || ''}"><span>${label}</span><b>${x?.status ? ST[x.status] : 'Отметить'}</b></button>`; };
-  cb.innerHTML = `<div class="disc-note">Отмечайте одним нажатием: <span class="s ok">✓</span> вовремя, <span class="s late">!</span> с опозданием или позже (например, «пятиминутку проведём после уборки»), <span class="s none">✕</span> не сделано. Повторное нажатие очищает.</div>
+  cb.innerHTML = `<div class="disc-note">Отмечайте одним нажатием: <span class="s ok">✓</span> вовремя, <span class="s late">!</span> с опозданием или позже (например, «пятиминутку проведём после уборки»), <span class="s none">✕</span> не сделано. Повторное нажатие очищает. Квадрат с точкой — администратор отметил сам; наведите или нажмите, чтобы поправить.</div>
     <div class="row between"><button class="btn sm ghost" id="wp">‹</button><b>Неделя ${ru(ymd(days[0]))} – ${ru(ymd(days[6]))}</b><button class="btn sm ghost" id="wn" ${wkOff >= 0 ? 'disabled' : ''}>›</button></div>
     <div class="legend small muted">П — пятиминутка · У — утренний отчёт · В — вечерний · Н — ночной · Г — генеральная уборка (воскресенье)</div>
     <div class="tw"><table class="t rep"><tr><th></th>${days.map((d) => `<th class="${ymd(d) === today ? 'td' : ''}">${d.toLocaleDateString('ru-RU', { weekday: 'short' })}<br><small>${d.getDate()}</small></th>`).join('')}<th>Итог</th></tr>
@@ -205,9 +205,9 @@ async function reports(cb) {
   cb.querySelector('#mn').onclick = () => { if (mOff < 0) { mOff++; reports(cb); } };
   cb.querySelectorAll('.s[data-r]').forEach((b) => b.onclick = async () => {
     const k = `${b.dataset.r}|${b.dataset.d}|${b.dataset.s}`, nv = NEXT[M[k]];
-    const q = nv ? C.sb.from('shift_reports').upsert({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s, status: nv })
+    const q = nv ? C.sb.from('shift_reports').upsert({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s, status: nv, source: 'admin', at: new Date().toISOString() })
       : C.sb.from('shift_reports').delete().match({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s });
-    M[k] = nv; b.className = 's ' + (nv || '');
+    M[k] = nv; delete SRC[k]; b.className = 's ' + (nv || '');
     const { error } = await q; if (error) C.toast(error.message);
   });
   cb.querySelectorAll('.mchk').forEach((b) => b.onclick = () => {

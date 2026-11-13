@@ -4,6 +4,7 @@ import { vQuest, vSim, questCard, loadDone, loadQuests } from './quest.js';
 import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.js';
 import { vTeam, feedUnread } from './team.js';
 import { vCompete, aCompete, compeSummary } from './compete.js';
+import { vShift } from './lead.js';
 import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -12,7 +13,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
-const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Менеджер' };
+const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Администратор' };
 const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
@@ -49,6 +50,7 @@ const IC = {
   rating: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>',
   me: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>',
   team: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.6 5.2"/></svg>',
+  shift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/></svg>',
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
 };
 
@@ -133,6 +135,7 @@ async function loadBase() {
 function tabs(cur) {
   const t = [['home', 'Главная'], ['learn', 'Обучение'], ['team', 'Команда'], ['book', 'Книга'], ['me', 'Профиль']];
   if (isAdmin()) t.push(['admin', 'Кабинет']);
+  if (S.me.role === 'lead') t.splice(1, 0, ['shift', 'Смена']);
   $tabs.hidden = false;
   $tabs.innerHTML = t.map(([k, n]) => `<a href="#/${k}" class="${cur === k ? 'on' : ''}">${IC[k]}<span>${n}</span>${k === 'team' && S.unread && cur !== 'team' ? `<i class="dotn">${S.unread > 9 ? '9+' : S.unread}</i>` : ''}</a>`).join('');
 }
@@ -156,6 +159,7 @@ async function route() {
     if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx(), p[1] ? decodeURIComponent(p[1]) : S.mainQuest?.id); }
     if (r === 'sim') { $tabs.hidden = true; return await vSim(ctx(), decodeURIComponent(p[1])); }
     if (r === 'book') { tabs('book'); return await vBook(p[1]); }
+    if (r === 'shift' && S.me.role === 'lead') { tabs('shift'); return await vShift(ctx()); }
     if (r === 'team') { tabs('team'); return await vTeam(ctx()); }
     if (r === 'compete') { tabs('team'); return await vCompete(ctx()); }
     if (r === 'rating') { tabs('team'); return await vRating(p[1] || 'month'); }
@@ -752,11 +756,11 @@ async function aStaff(ab) {
   <form class="card stack" id="nf"><b>Добавить сотрудника</b>
     <div class="grid2"><input id="fn" placeholder="Имя и фамилия" required><input id="fp" type="tel" placeholder="Телефон 8 7__ ___ __ __" required>
     <select id="fr">${rests.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
-    <select id="fpos">${Object.entries(POS).filter(([k]) => k !== 'manager').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+    <select id="fpos">${Object.entries(POS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
     <label class="small muted" style="display:flex;flex-direction:column;gap:4px">День рождения (необязательно)<input id="fbd" type="date"></label></div>
     <button class="btn" id="nb">Добавить и выдать код</button></form>
   <div class="tw"><table class="t"><tr><th>Сотрудник</th><th>Точка</th><th>Был(а)</th><th></th></tr>
-  ${list.map((p) => `<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b>${p.role === 'admin' ? ' <span class="pill acc">админ</span>' : ''}<div class="small muted">${POS[p.position] || ''} · ${fmtPhone(p.phone)}</div>${p.role === 'admin' ? '' : `<label class="bdl small muted">🎂 <input type="date" data-bd="${p.id}" value="${p.birthday || ''}"></label>`}</td>
+  ${list.map((p) => `<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b>${p.role === 'admin' ? ' <span class="pill acc">сервис-менеджер</span>' : p.role === 'lead' ? ' <span class="pill acc">администратор</span>' : ''}<div class="small muted">${POS[p.position] || ''} · ${fmtPhone(p.phone)}</div>${p.role === 'admin' ? '' : `<label class="bdl small muted">🎂 <input type="date" data-bd="${p.id}" value="${p.birthday || ''}"></label>`}</td>
     <td class="small">${esc(S.rests.find((r) => r.id === p.restaurant_id)?.name || '')}</td>
     <td class="small muted">${p.last_seen_at ? new Date(p.last_seen_at).toLocaleDateString('ru-RU') : 'не входил(а)'}</td>
     <td>${p.role === 'admin' ? '' : `<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-reset="${p.id}">Новый код</button><button class="btn sm ghost" data-act="${p.id}" data-on="${p.active ? 0 : 1}">${p.active ? 'Отключить' : 'Включить'}</button></div>`}</td></tr>`).join('')}

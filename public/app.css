@@ -668,3 +668,14 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .pub{display:flex;flex-direction:column;gap:16px;padding-top:20px}
 .pub-k{font-weight:800;color:var(--acc)}
 .pub-b{font-size:17px;line-height:1.65;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px}
+
+/* ---------- смена администратора ---------- */
+.marks{display:flex;flex-direction:column;gap:8px}
+.mark{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:var(--r-md);border:2px solid var(--line);background:var(--card)}
+.mark .e{font-size:24px}.mark .mt{flex:1;display:flex;flex-direction:column}.mark small{color:var(--muted);font-size:12.5px}
+.mark .ck{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:900;color:#fff}
+.mark.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--card))}.mark.on .ck{background:var(--ok);border-color:var(--ok)}
+.mark.on.late{border-color:var(--acc2)}.mark.on.late .ck{background:var(--acc2);border-color:var(--acc2)}
+.mark.on.none{border-color:var(--bad)}.mark.on.none .ck{background:var(--bad);border-color:var(--bad)}
+.mark[disabled]{opacity:1;pointer-events:none}
+.s.self{position:relative}.s.self::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
