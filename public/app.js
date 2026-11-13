@@ -5,6 +5,7 @@ import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.
 import { vTeam, feedUnread } from './team.js';
 import { vCompete, aCompete, compeSummary } from './compete.js';
 import { vShift } from './lead.js';
+import { importStaff } from './importer.js';
 import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -758,13 +759,14 @@ async function aStaff(ab) {
     <select id="fr">${rests.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
     <select id="fpos">${Object.entries(POS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
     <label class="small muted" style="display:flex;flex-direction:column;gap:4px">День рождения (необязательно)<input id="fbd" type="date"></label></div>
-    <button class="btn" id="nb">Добавить и выдать код</button></form>
+    <div class="row" style="flex-wrap:wrap"><button class="btn" id="nb">Добавить и выдать код</button><button type="button" class="btn ghost" id="imp">📥 Импорт из анкеты (CSV)</button></div></form>
   <div class="tw"><table class="t"><tr><th>Сотрудник</th><th>Точка</th><th>Был(а)</th><th></th></tr>
   ${list.map((p) => `<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b>${p.role === 'admin' ? ' <span class="pill acc">сервис-менеджер</span>' : p.role === 'lead' ? ' <span class="pill acc">администратор</span>' : ''}<div class="small muted">${POS[p.position] || ''} · ${fmtPhone(p.phone)}</div>${p.role === 'admin' ? '' : `<label class="bdl small muted">🎂 <input type="date" data-bd="${p.id}" value="${p.birthday || ''}"></label>`}</td>
     <td class="small">${esc(S.rests.find((r) => r.id === p.restaurant_id)?.name || '')}</td>
     <td class="small muted">${p.last_seen_at ? new Date(p.last_seen_at).toLocaleDateString('ru-RU') : 'не входил(а)'}</td>
     <td>${p.role === 'admin' ? '' : `<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-reset="${p.id}">Новый код</button><button class="btn sm ghost" data-act="${p.id}" data-on="${p.active ? 0 : 1}">${p.active ? 'Отключить' : 'Включить'}</button></div>`}</td></tr>`).join('')}
   </table></div>`;
+  document.getElementById('imp').onclick = () => importStaff({ ...ctx(), adminCall }, new Set((ppl || []).map((p) => p.phone)), () => aStaff(ab));
   document.getElementById('nf').onsubmit = async (e) => {
     e.preventDefault(); const b = document.getElementById('nb'); b.disabled = true;
     try {
