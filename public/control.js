@@ -23,7 +23,7 @@ function copyModal(title, text) {
 /* ============ СВОДКА ============ */
 export async function aDash(ctx, ab) {
   C = ctx; const { sb, S } = ctx;
-  const { data: d, error } = await sb.rpc('admin_dashboard', { p_concept: S.concept });
+  const [{ data: d, error }, { data: dsc }] = await Promise.all([sb.rpc('admin_dashboard', { p_concept: S.concept }), sb.rpc('admin_discipline', { p_concept: S.concept })]);
   if (error) { ab.innerHTML = `<p class="muted">${esc(error.message)}</p>`; return; }
   const R = d.rests || [];
   const sum = R.reduce((a, r) => ({ staff: a.staff + r.staff, act: a.act + r.active7 }), { staff: 0, act: 0 });
@@ -36,7 +36,11 @@ export async function aDash(ctx, ab) {
         <a class="ring sm ${tone(a?.score)}" style="--p:${a?.score ?? 0}" href="#/admin/control/audits" title="Последняя проверка"><span>${a ? a.score + '%' : '—'}</span></a></div>
       <span class="small muted">${a ? `Проверка ${ru(a.at)}${r.audit30 != null ? ` · среднее за 30 дней ${r.audit30}%` : ''}` : 'Проверок ещё не было'}</span>
       <div class="kpis"><div><b>${r.active7}/${r.staff}</b><small>заходили за 7 дней</small></div><div><b>${Math.round(r.week_pts)}</b><small>баллов на человека</small></div><div><b>${r.tests}</b><small>тестов сдано</small></div></div>
-      <a class="rrow" href="#/admin/control/reports"><span>Отчёты смен</span><span class="dots"><i class="ok">${rp.ok}</i><i class="mid">${rp.late}</i><i class="bad">${rp.none}</i></span></a>
+      ${(() => { const x = (dsc || {})[r.id] || {}, b = x.brief || {}, mk = (v) => v === 'ok' ? '✓' : v === 'late' ? '!' : v === 'none' ? '✕' : '·';
+        return `<a class="rrow" href="#/admin/control/reports"><span>Пятиминутки за неделю</span><span class="dots"><i class="ok">${b.ok || 0}</i><i class="mid">${b.late || 0}</i><i class="bad">${b.none || 0}</i></span></a>
+        <a class="rrow" href="#/admin/control/reports"><span>Генуборка · инвентаризация · табель</span><b class="mk">${mk(x.clean)} ${mk(x.inventory)} ${mk(x.tabel)}</b></a>
+        <a class="rrow" href="#/admin/control/reports"><span>Видео пятиминуток за месяц</span><b>${x.videos || 0} из ${x.admins || 0}</b></a>`; })()}
+      <a class="rrow" href="#/admin/control/reports"><span>Все отметки дисциплины</span><span class="dots"><i class="ok">${rp.ok}</i><i class="mid">${rp.late}</i><i class="bad">${rp.none}</i></span></a>
       <a class="rrow" href="#/admin/control/tasks"><span>Задачи администраторам</span><b class="${r.overdue ? 'bad-t' : ''}">${r.open_tasks}${r.overdue ? ` · просрочено ${r.overdue}` : ''}</b></a></div>`;
   }).join('')}</div>
   <div class="dgrid">
@@ -53,7 +57,7 @@ export async function aDash(ctx, ab) {
       const rp = r.reports || {};
       L.push(`▪️ ${r.name}`, `Заходили в обучение: ${r.active7} из ${r.staff}`, `Баллов на сотрудника за неделю: ${Math.round(r.week_pts)}`, `Сдано тестов всего: ${r.tests}`,
         `Последняя проверка сервиса: ${r.last_audit ? r.last_audit.score + '% (' + ru(r.last_audit.at) + ')' : 'не проводилась'}`,
-        `Отчёты смен: вовремя ${rp.ok || 0}, с опозданием ${rp.late || 0}, не отправлены ${rp.none || 0}`,
+        `Отчёты и пятиминутки: вовремя ${rp.ok || 0}, с опозданием ${rp.late || 0}, не сделано ${rp.none || 0}`,
         `Открытые задачи администраторов: ${r.open_tasks}${r.overdue ? `, из них просрочено ${r.overdue}` : ''}`, '');
     });
     if ((d.weak || []).length) { L.push('Темы, где чаще ошибаются:'); d.weak.slice(0, 3).forEach((w) => L.push(`— ${w.question} (${w.pct}% ошибок)`)); L.push(''); }
@@ -63,13 +67,14 @@ export async function aDash(ctx, ab) {
 }
 
 /* ============ SERVICE CONTROL ============ */
-const CSUB = [['audits', 'Проверки'], ['reports', 'Отчёты смен'], ['tasks', 'Задачи администраторам'], ['setup', 'Администраторы и чек-листы']];
+const CSUB = [['audits', 'Проверки'], ['reports', 'Дисциплина'], ['briefs', 'Пятиминутки'], ['tasks', 'Задачи администраторам'], ['setup', 'Администраторы и чек-листы']];
 export async function aControl(ctx, ab, sub = 'audits') {
   C = ctx;
   ab.innerHTML = `<div class="subtabs">${CSUB.map(([k, n]) => `<a href="#/admin/control/${k}" class="${sub === k ? 'on' : ''}">${n}</a>`).join('')}</div><div id="cb" class="stack"><div class="spin"></div></div>`;
   const cb = ab.querySelector('#cb');
   if (sub === 'reports') return reports(cb);
   if (sub === 'tasks') return tasks(cb);
+  if (sub === 'briefs') return briefs(cb);
   if (sub === 'setup') return setup(cb);
   return audits(cb);
 }
@@ -156,30 +161,105 @@ function viewAudit(a, mn) {
   m.querySelector('#vd').onclick = async () => { if (!(await C.ask('Удалить эту проверку?', 'Удалить', true))) return; await C.sb.from('audits').delete().eq('id', a.id); m.remove(); C.route(); };
 }
 
-/* --- журнал отчётов смены --- */
-const SLOTS = [['morning', 'У', 'Утро: официанты и стоп-лист'], ['evening', 'В', 'Вечер: резервы и официанты'], ['night', 'Н', 'Ночь: закрытие смены']];
+/* --- дисциплина: ежедневные, еженедельные и ежемесячные обязательства --- */
+const SLOTS = [['brief', 'П', 'Пятиминутка в 10:45'], ['morning', 'У', 'Утренний отчёт: официанты и стоп-лист'], ['evening', 'В', 'Вечерний отчёт: резервы и официанты'], ['night', 'Н', 'Ночной отчёт: закрытие смены']];
 const NEXT = { undefined: 'ok', ok: 'late', late: 'none', none: undefined };
-let wkOff = 0;
+const ST = { ok: 'Вовремя', late: 'С опозданием', none: 'Не сделано' };
+const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const DEAD = { inventory: 28, tabel: 5 };
+let wkOff = 0, mOff = 0;
 async function reports(cb) {
   const t = new Date(); t.setDate(t.getDate() - ((t.getDay() + 6) % 7) + wkOff * 7);
   const days = [...Array(7)].map((_, i) => { const d = new Date(t); d.setDate(t.getDate() + i); return d; });
+  const m0 = new Date(); m0.setDate(1); m0.setMonth(m0.getMonth() + mOff); const mS = ymd(m0);
   const ids = rests().map((r) => r.id);
-  const { data } = await C.sb.from('shift_reports').select('*').in('restaurant_id', ids).gte('day', ymd(days[0])).lte('day', ymd(days[6]));
+  const [{ data }, { data: mc }, mg] = await Promise.all([
+    C.sb.from('shift_reports').select('*').in('restaurant_id', ids).gte('day', ymd(days[0])).lte('day', ymd(days[6])),
+    C.sb.from('monthly_checks').select('*').in('restaurant_id', ids).eq('month', mS), loadMgrs()]);
   const M = {}; (data || []).forEach((x) => (M[`${x.restaurant_id}|${x.day}|${x.slot}`] = x.status));
+  const MC = {}; (mc || []).forEach((x) => (MC[`${x.restaurant_id}|${x.kind}|${x.manager_id || 0}`] = x));
   const today = ymd(new Date());
-  cb.innerHTML = `<p class="small muted">Обязательные отчёты администраторов в общий чат. Нажимайте на квадрат: зелёный — вовремя, жёлтый — с опозданием, красный — не отправлен. У — утро (официанты, стоп-лист), В — вечер (резервы, официанты), Н — ночь (закрытие смены).</p>
-    <div class="row between"><button class="btn sm ghost" id="wp">‹ Неделя</button><b>${ru(ymd(days[0]))} – ${ru(ymd(days[6]))}</b><button class="btn sm ghost" id="wn" ${wkOff >= 0 ? 'disabled' : ''}>Неделя ›</button></div>
+  const cell = (r, d, s, l, tt) => { const v = M[`${r}|${d}|${s}`]; return `<button class="s ${v || ''}" data-r="${r}" data-d="${d}" data-s="${s}" title="${tt}${v ? ': ' + ST[v] : ''}">${l}</button>`; };
+  const mbtn = (r, kind, mid, label) => { const x = MC[`${r}|${kind}|${mid || 0}`]; return `<button class="mchk ${x?.status || ''}" data-mr="${r}" data-mk="${kind}" data-mm="${mid || ''}"><span>${label}</span><b>${x?.status ? ST[x.status] : 'Отметить'}</b></button>`; };
+  cb.innerHTML = `<div class="disc-note">Отмечайте одним нажатием: <span class="s ok">✓</span> вовремя, <span class="s late">!</span> с опозданием или позже (например, «пятиминутку проведём после уборки»), <span class="s none">✕</span> не сделано. Повторное нажатие очищает.</div>
+    <div class="row between"><button class="btn sm ghost" id="wp">‹</button><b>Неделя ${ru(ymd(days[0]))} – ${ru(ymd(days[6]))}</b><button class="btn sm ghost" id="wn" ${wkOff >= 0 ? 'disabled' : ''}>›</button></div>
+    <div class="legend small muted">П — пятиминутка · У — утренний отчёт · В — вечерний · Н — ночной · Г — генеральная уборка (воскресенье)</div>
     <div class="tw"><table class="t rep"><tr><th></th>${days.map((d) => `<th class="${ymd(d) === today ? 'td' : ''}">${d.toLocaleDateString('ru-RU', { weekday: 'short' })}<br><small>${d.getDate()}</small></th>`).join('')}<th>Итог</th></tr>
-    ${rests().map((r) => { let ok = 0, all = 0; const cells = days.map((d) => `<td class="${ymd(d) === today ? 'td' : ''}"><div class="sl">${SLOTS.map(([s, l, tt]) => { const v = M[`${r.id}|${ymd(d)}|${s}`]; if (v) { all++; if (v === 'ok') ok++; } return `<button class="s ${v || ''}" data-r="${r.id}" data-d="${ymd(d)}" data-s="${s}" title="${tt}">${l}</button>`; }).join('')}</div></td>`).join('');
-      return `<tr><th class="rn">${esc(short(r.name))}</th>${cells}<td><b>${all ? Math.round(100 * ok / all) + '%' : '—'}</b><div class="small muted">вовремя</div></td></tr>`; }).join('')}</table></div>`;
+    ${rests().map((r) => {
+      let ok = 0, all = 0;
+      days.forEach((d) => [...SLOTS.map((x) => x[0]), 'clean'].forEach((s) => { const v = M[`${r.id}|${ymd(d)}|${s}`]; if (v) { all++; if (v === 'ok') ok++; } }));
+      return `<tr><th class="rn">${esc(short(r.name))}</th>${days.map((d, i) => `<td class="${ymd(d) === today ? 'td' : ''}"><div class="sl">${SLOTS.map(([s, l, tt]) => cell(r.id, ymd(d), s, l, tt)).join('')}${i === 6 ? cell(r.id, ymd(d), 'clean', 'Г', 'Генеральная уборка') : ''}</div></td>`).join('')}
+        <td><b>${all ? Math.round(100 * ok / all) + '%' : '—'}</b><div class="small muted">вовремя</div></td></tr>`;
+    }).join('')}</table></div>
+    <div class="row between" style="margin-top:8px"><button class="btn sm ghost" id="mp">‹</button><b class="h2" style="text-transform:capitalize">${MONTHS[m0.getMonth()]} ${m0.getFullYear()}</b><button class="btn sm ghost" id="mn" ${mOff >= 0 ? 'disabled' : ''}>›</button></div>
+    <div class="rsgrid">${rests().map((r) => {
+      const ad = mg.filter((m) => m.active && m.restaurant_id === r.id);
+      return `<div class="rcard"><b class="h2">${esc(short(r.name))}</b>
+        ${mbtn(r.id, 'inventory', null, `📦 Инвентаризация до ${DEAD.inventory}-го`)}${mbtn(r.id, 'tabel', null, `🗓️ Табель до ${DEAD.tabel}-го`)}
+        <span class="small muted">🎥 Видео пятиминутки — раз в месяц от каждого администратора</span>
+        ${ad.length ? ad.map((m) => { const x = MC[`${r.id}|video|${m.id}`]; return `${mbtn(r.id, 'video', m.id, m.name)}${x?.link ? `<a class="small" href="${esc(x.link)}" target="_blank" rel="noopener">▶ Смотреть видео</a>` : ''}`; }).join('') : '<span class="small muted">Добавьте администраторов во вкладке «Администраторы и чек-листы».</span>'}</div>`;
+    }).join('')}</div>`;
   cb.querySelector('#wp').onclick = () => { wkOff--; reports(cb); };
   cb.querySelector('#wn').onclick = () => { if (wkOff < 0) { wkOff++; reports(cb); } };
-  cb.querySelectorAll('.s').forEach((b) => b.onclick = async () => {
+  cb.querySelector('#mp').onclick = () => { mOff--; reports(cb); };
+  cb.querySelector('#mn').onclick = () => { if (mOff < 0) { mOff++; reports(cb); } };
+  cb.querySelectorAll('.s[data-r]').forEach((b) => b.onclick = async () => {
     const k = `${b.dataset.r}|${b.dataset.d}|${b.dataset.s}`, nv = NEXT[M[k]];
     const q = nv ? C.sb.from('shift_reports').upsert({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s, status: nv })
       : C.sb.from('shift_reports').delete().match({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s });
     M[k] = nv; b.className = 's ' + (nv || '');
     const { error } = await q; if (error) C.toast(error.message);
+  });
+  cb.querySelectorAll('.mchk').forEach((b) => b.onclick = () => {
+    const r = b.dataset.mr, kind = b.dataset.mk, mid = +b.dataset.mm || null, x = MC[`${r}|${kind}|${mid || 0}`];
+    const m = modal(`<div class="row between"><b class="h2">${esc(b.querySelector('span').textContent)}</b><button class="pm" data-x>✕</button></div>
+      <span class="small muted">${esc(rname(r))} · ${MONTHS[m0.getMonth()]}</span>
+      <div class="stack" style="gap:8px">${Object.entries(ST).map(([k, v]) => `<button class="btn ${x?.status === k ? '' : 'ghost'}" data-st="${k}">${v}</button>`).join('')}</div>
+      ${kind === 'video' ? `<input id="vl" placeholder="Ссылка на видео (Google Диск, Telegram, YouTube)" value="${esc(x?.link || '')}">` : ''}
+      <input id="vn" placeholder="Комментарий (необязательно)" value="${esc(x?.note || '')}">
+      ${x ? '<button class="btn ghost" data-st="">Очистить отметку</button>' : ''}`);
+    m.querySelectorAll('[data-st]').forEach((s) => s.onclick = async () => {
+      let error;
+      if (x) ({ error } = s.dataset.st ? await C.sb.from('monthly_checks').update({ status: s.dataset.st, link: m.querySelector('#vl')?.value.trim() || null, note: m.querySelector('#vn').value.trim() || null, updated_at: new Date().toISOString() }).eq('id', x.id) : await C.sb.from('monthly_checks').delete().eq('id', x.id));
+      else ({ error } = await C.sb.from('monthly_checks').insert({ restaurant_id: r, month: mS, kind, manager_id: mid, status: s.dataset.st, link: m.querySelector('#vl')?.value.trim() || null, note: m.querySelector('#vn').value.trim() || null }));
+      if (error) return C.toast(error.message); m.remove(); reports(cb);
+    });
+  });
+}
+
+/* --- пятиминутки: темы и материалы --- */
+async function briefs(cb) {
+  const { data: list } = await C.sb.from('briefs').select('*').or(`concept.is.null,concept.eq.${C.S.concept}`).order('day', { ascending: false }).limit(60);
+  const today = ymd(new Date());
+  const url = (b) => `${location.origin}${location.pathname}#/brief/${b.token}`;
+  const up = (list || []).filter((b) => b.day >= today).reverse(), past = (list || []).filter((b) => b.day < today);
+  const row = (b) => `<div class="brief-r ${b.day === today ? 'now' : ''}"><div class="bd-d"><b>${new Date(b.day + 'T12:00').getDate()}</b><small>${new Date(b.day + 'T12:00').toLocaleDateString('ru-RU', { month: 'short', weekday: 'short' })}</small></div>
+    <div class="bt"><b>${esc(b.title)}</b>${b.body ? `<small>${esc(b.body.slice(0, 120))}${b.body.length > 120 ? '…' : ''}</small>` : ''}<small class="muted">${b.concept ? b.concept.toUpperCase() : 'Обе команды'}</small></div>
+    <div class="row" style="gap:4px"><button class="btn sm" data-bs="${b.id}">Отправить</button><button class="pm" data-be="${b.id}" aria-label="Изменить">✎</button></div></div>`;
+  cb.innerHTML = `<p class="small muted">Задайте тему заранее. Администратор получит ссылку на материал (без входа в приложение), а сотрудники увидят тему дня на главной.</p>
+    <button class="btn" id="bn">+ Тема пятиминутки</button>
+    <div class="sec-t"><span class="h2">Ближайшие</span></div>${up.length ? up.map(row).join('') : '<p class="muted">Тем на ближайшие дни нет.</p>'}
+    ${past.length ? `<details><summary class="small muted">Прошедшие (${past.length})</summary><div class="stack" style="gap:8px;margin-top:8px">${past.map(row).join('')}</div></details>` : ''}`;
+  const edit = (b) => {
+    const m = modal(`<div class="row between"><b class="h2">${b ? 'Тема пятиминутки' : 'Новая тема'}</b><button class="pm" data-x>✕</button></div>
+      <label class="small muted" style="display:flex;flex-direction:column;gap:4px">Дата<input id="bd" type="date" value="${b?.day || today}"></label>
+      <select id="bc"><option value="${C.S.concept}">Только ${C.S.concept === 'grano' ? 'GRANO' : 'VILKA'}</option><option value="" ${b && !b.concept ? 'selected' : ''}>Обе команды</option></select>
+      <input id="bt" placeholder="Тема, например: «Встреча гостя без вопроса „Вас ожидают?“»" value="${esc(b?.title || '')}">
+      <textarea id="bb" rows="10" placeholder="Материал для администратора: что сказать команде, примеры фраз, на что обратить внимание">${esc(b?.body || '')}</textarea>
+      <button class="btn" id="bs">Сохранить</button>${b ? '<button class="btn ghost" id="bdel" style="color:var(--bad)">Удалить</button>' : ''}`, 'wide-m');
+    m.querySelector('#bs').onclick = async () => {
+      const row = { day: m.querySelector('#bd').value, concept: m.querySelector('#bc').value || null, title: m.querySelector('#bt').value.trim(), body: m.querySelector('#bb').value.trim() || null };
+      if (!row.title || !row.day) return C.toast('Укажите дату и тему');
+      const { error } = b ? await C.sb.from('briefs').update(row).eq('id', b.id) : await C.sb.from('briefs').insert(row);
+      if (error) return C.toast(error.message); m.remove(); C.toast('Сохранено'); briefs(cb);
+    };
+    if (b) m.querySelector('#bdel').onclick = async () => { if (!(await C.ask('Удалить тему?', 'Удалить', true))) return; await C.sb.from('briefs').delete().eq('id', b.id); m.remove(); briefs(cb); };
+  };
+  cb.querySelector('#bn').onclick = () => edit(null);
+  cb.querySelectorAll('[data-be]').forEach((x) => x.onclick = () => edit(list.find((b) => b.id === +x.dataset.be)));
+  cb.querySelectorAll('[data-bs]').forEach((x) => x.onclick = () => {
+    const b = list.find((y) => y.id === +x.dataset.bs);
+    copyModal('Сообщение администраторам', [`Пятиминутка ${new Date(b.day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })}`, `Тема: ${b.title}`, '', `Материал: ${url(b)}`, '', 'Прошу Вас заранее ознакомиться с материалом и провести пятиминутку с командой в 10:45.', '', SIGN].join('\n'));
   });
 }
 
@@ -306,4 +386,20 @@ export function bindHomeAssignments(ctx) {
     if (error) { ctx.toast(error.message); b.disabled = false; return; }
     ctx.confetti(); b.closest('.as-i').remove(); if (!document.querySelector('.as-i')) document.querySelector('.assign')?.remove();
   });
+}
+
+/* ============ тема пятиминутки на главной ============ */
+export async function homeBrief(ctx) {
+  const { data: b } = await ctx.sb.rpc('today_brief');
+  if (!b) return '';
+  return `<details class="brief-home"><summary><span class="e">📣</span><div><small>Тема пятиминутки сегодня</small><b>${esc(b.title)}</b></div></summary>${b.body ? `<div class="bb">${esc(b.body).replace(/\n/g, '<br>')}</div>` : ''}</details>`;
+}
+/* ============ публичная страница материала (для администраторов, без входа) ============ */
+export async function publicBrief(sb, token, $app) {
+  const { data: b } = await sb.rpc('brief_public', { p_token: token });
+  if (b?.concept) document.documentElement.dataset.concept = b.concept;
+  $app.innerHTML = b ? `<article class="pub"><div class="pub-k">Пятиминутка · ${new Date(b.day + 'T12:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })}</div>
+      <h1 class="h1">${esc(b.title)}</h1>${b.body ? `<div class="pub-b">${esc(b.body).replace(/\n/g, '<br>')}</div>` : ''}
+      <div class="sign">Материал подготовила: ${SIGN}</div></article>`
+    : '<div class="card stack"><b>Материал не найден</b><p class="muted">Ссылка устарела. Запросите новую у сервис-менеджера.</p></div>';
 }

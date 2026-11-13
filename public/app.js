@@ -4,7 +4,7 @@ import { vQuest, vSim, questCard, loadDone, loadQuests } from './quest.js';
 import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.js';
 import { vTeam, feedUnread } from './team.js';
 import { vCompete, aCompete, compeSummary } from './compete.js';
-import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments } from './control.js';
+import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
 const SB_KEY = 'sb_publishable_pkhdRyL8FhjAHaKgXmuh6Q_Oi0zlZ9S';
@@ -62,6 +62,8 @@ function setConcept(c) {
 async function boot() {
   const q = new URLSearchParams(location.search).get('c');
   setConcept(q === 'grano' ? 'grano' : (localStorage.getItem('vg_concept') || 'vilka'));
+  const pb = location.hash.match(/^#\/brief\/(\w+)/);
+  if (pb) { $tabs.hidden = true; return publicBrief(sb, pb[1], $app); }
   const { data } = await sb.auth.getSession();
   if (!data.session) return renderLogin();
   await afterLogin();
@@ -200,6 +202,7 @@ async function vHome() {
       <a class="b3 b3-play" href="#/games"><span class="e">🎮</span><b>Играть</b><small>квест, блиц</small></a>
       <a class="b3 b3-rate" href="#/rating"><span class="e">🏆</span><b>Рейтинг</b><small>${S.stats.month} за месяц</small></a>
     </div>
+    <div id="brf"></div>
     <div id="asgn"></div>
     ${S.mainQuest && S.quest.size < S.mainQuest.steps.length ? questCard(S.mainQuest, S.quest) : ''}
     ${hero}
@@ -219,6 +222,7 @@ async function vHome() {
   if (!tour()) greetDaily(nb);
   if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
+  homeBrief(ctx()).then((html) => { const el = document.getElementById('brf'); if (el && html) el.innerHTML = html; });
   if (!isAdmin()) homeAssignments(ctx()).then((html) => { const el = document.getElementById('asgn'); if (el && html) { el.innerHTML = html; bindHomeAssignments(ctx()); } });
   compeSummary(sb, S.concept).then((x) => { const el = document.getElementById('compBan'); if (!x || !el) return;
     el.querySelector('small').textContent = x.claim ? 'Есть награда — забери!' : `Выполнено ${x.done} из ${x.total} · битва ресторанов`;

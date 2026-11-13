@@ -645,3 +645,26 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .as-i{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--card2);border-radius:14px;padding:10px 12px}
 .as-i>div{display:flex;flex-direction:column}.as-i small{color:var(--muted);font-size:13px}.as-i.late .due{color:var(--bad);font-weight:800}
 @media (max-width:600px){.kpis b{font-size:17px}.s{width:22px;height:22px}}
+
+/* ---------- дисциплина и пятиминутки ---------- */
+.disc-note{font-size:13.5px;color:var(--muted);line-height:1.6}
+.disc-note .s{display:inline-grid;place-items:center;width:20px;height:20px;vertical-align:middle;font-size:11px}
+.mchk{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:var(--card2);font-size:14px}
+.mchk b{font-size:13px;color:var(--muted)}
+.mchk.ok{border-color:var(--ok)}.mchk.ok b{color:var(--ok)}
+.mchk.late{border-color:var(--acc2)}.mchk.late b{color:var(--acc2)}
+.mchk.none{border-color:var(--bad)}.mchk.none b{color:var(--bad)}
+.mk{letter-spacing:4px;font-weight:900}
+.brief-r{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px}
+.brief-r.now{border:2px solid var(--acc)}
+.bd-d{width:52px;flex:none;text-align:center;display:flex;flex-direction:column;background:var(--card2);border-radius:12px;padding:6px 0}
+.bd-d b{font-size:22px;line-height:1}.bd-d small{font-size:11px;color:var(--muted)}
+.brief-r .bt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.brief-r .bt small{font-size:12.5px}
+.brief-home{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px}
+.brief-home summary{display:flex;gap:12px;align-items:center;cursor:pointer;list-style:none}
+.brief-home summary::-webkit-details-marker{display:none}
+.brief-home summary .e{font-size:26px}.brief-home summary div{display:flex;flex-direction:column}.brief-home small{color:var(--muted);font-size:12.5px}
+.brief-home .bb{margin-top:10px;font-size:15px;line-height:1.55}
+.pub{display:flex;flex-direction:column;gap:16px;padding-top:20px}
+.pub-k{font-weight:800;color:var(--acc)}
+.pub-b{font-size:17px;line-height:1.65;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px}
