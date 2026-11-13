@@ -9,6 +9,7 @@ import { importStaff } from './importer.js';
 import { aMaterials, videoEmbed } from './materials.js';
 import { mountDaily } from './daily.js';
 import { vBuild, vSpot, aSpot } from './games.js';
+import { vPath, aCerts } from './path.js';
 import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief, homeSummary, bindHomeSummary } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -18,7 +19,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Администратор' };
-const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', game_build: 'Игра «Собери блюдо»', game_spot: 'Игра «Найди ошибку»', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', exam: 'Аттестация', game_build: 'Игра «Собери блюдо»', game_spot: 'Игра «Найди ошибку»', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -161,6 +162,7 @@ async function route() {
     if (r === 'play') { tabs(p[2] ? 'learn' : 'home'); return await vPlay(p[1], p[2] ? decodeURIComponent(p[2]) : null); }
     if (r === 'shop') { tabs('home'); return await vShop(p[1]); }
     if (r === 'games') { tabs('home'); return await vGames(); }
+    if (r === 'path') { tabs('me'); return await vPath(ctx()); }
     if (r === 'game') { $tabs.hidden = true; return await (p[1]?.startsWith('spot') ? vSpot(ctx()) : vBuild(ctx())); }
     if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx(), p[1] ? decodeURIComponent(p[1]) : S.mainQuest?.id); }
     if (r === 'sim') { $tabs.hidden = true; return await vSim(ctx(), decodeURIComponent(p[1])); }
@@ -474,6 +476,7 @@ async function vLearn() {
   <div class="stack">
     ${isAdmin() ? conceptSwitch() : ''}
     <div class="h1">Меню знаний</div>
+    ${isAdmin() ? '' : '<a class="pathban" href="#/path"><span class="e">🗺️</span><div><b>Моя карта развития</b><small>Где я сейчас и что дальше</small></div><span class="go">›</span></a>'}
     <div class="prog"><div class="bar"><i style="width:${avail.length ? Math.round(100 * passed / avail.length) : 0}%"></i></div><span class="pill acc">${passed}/${avail.length}</span></div>
     <p class="small muted">Каждая тарелка — раздел книги. Урок, квиз и тест закрашивают её по кругу. Ошибки вернутся на повторение через 1, 3 и 7 дней.</p>
     <div class="path">
@@ -552,13 +555,13 @@ async function vPlay(mode, block) {
   const { data, error } = await sb.rpc('start_session', { p_mode: mode, p_block: block, p_concept: S.concept });
   if (error) throw error;
   const qs = data.questions || [];
-  const backHref = block ? '#/block/' + encodeURIComponent(block) : '#/home';
+  const backHref = block ? '#/block/' + encodeURIComponent(block) : mode === 'exam' ? '#/path' : '#/home';
   if (!data.session || !qs.length) {
     $app.innerHTML = `<div class="result"><div style="font-size:64px">${mode === 'review' ? '🎉' : '🧑‍🍳'}</div><div class="h2">${mode === 'review' ? 'Повторять пока нечего' : 'Вопросы ещё готовятся'}</div><p class="muted">${mode === 'review' ? 'Вопросы вернутся, когда придёт их время. А пока — новый урок.' : 'Сервис-менеджер скоро добавит вопросы к этому разделу.'}</p><a class="btn block" href="#/learn">К меню знаний</a></div>`;
     return;
   }
   document.body.classList.add('playing');
-  const title = { quiz: 'Квиз', test: 'Тест', review: 'Повторение', speed: 'Блиц' }[mode];
+  const title = { quiz: 'Квиз', test: 'Тест', review: 'Повторение', speed: 'Блиц', exam: 'Аттестация' }[mode];
   const marks = [];
   let i = 0, right = 0, earned = 0, combo = 0, best = 0, ended = false, timeLeft = 60, tmr = null;
   const cleanup = () => { clearInterval(tmr); document.body.classList.remove('playing'); window.removeEventListener('hashchange', cleanup); };
@@ -573,7 +576,7 @@ async function vPlay(mode, block) {
     const total = mode === 'speed' ? i : (r?.total || qs.length), sc = r?.score ?? right;
     const pct = total ? Math.round(100 * sc / total) : 0;
     const stars = mode === 'speed' ? (sc >= 15 ? 3 : sc >= 8 ? 2 : sc >= 3 ? 1 : 0) : (pct >= 100 ? 3 : pct >= 80 ? 2 : pct >= 50 ? 1 : 0);
-    const head = mode === 'test' ? (r?.passed ? 'Тест сдан!' : 'Почти! Нужно 80%') : mode === 'speed' ? 'Время вышло!' : stars >= 2 ? 'Отлично!' : 'Хорошая попытка';
+    const head = mode === 'exam' ? (r?.passed ? 'Аттестация пройдена!' : 'Пока не сдано — нужно 80%') : mode === 'test' ? (r?.passed ? 'Тест сдан!' : 'Почти! Нужно 80%') : mode === 'speed' ? 'Время вышло!' : stars >= 2 ? 'Отлично!' : 'Хорошая попытка';
     $app.innerHTML = h`
     <div class="result">
       <div class="res-ch" id="resch"></div>
@@ -581,7 +584,7 @@ async function vPlay(mode, block) {
       <div class="h1">${head}</div>
       <div class="big">${sc}<span class="muted" style="font-size:32px">/${total}</span></div>
       <div class="rgrid"><div><b style="color:var(--acc2)">+${earned}</b><span>баллов</span></div><div><b>${mode === 'speed' ? sc : pct + '%'}</b><span>${mode === 'speed' ? 'верных' : 'точность'}</span></div><div><b style="color:#ff7a1a">${best}🔥</b><span>лучшая серия</span></div></div>
-      <p class="muted">${mode === 'test' && !r?.passed ? 'Пролистай урок ещё раз — и вперёд.' : mode === 'speed' ? 'Завтра попробуй побить свой результат.' : 'Ошибки вернутся на повторение завтра.'}</p>
+      <p class="muted">${mode === 'exam' ? (r?.passed ? 'Следующий этап на карте развития уже открыт.' : 'Повтори разделы, где ошибался, и попробуй снова.') : mode === 'test' && !r?.passed ? 'Пролистай урок ещё раз — и вперёд.' : mode === 'speed' ? 'Завтра попробуй побить свой результат.' : 'Ошибки вернутся на повторение завтра.'}</p>
       <div class="row" style="width:100%"><a class="btn ghost" style="flex:1" href="${backHref}">Готово</a><button class="btn" style="flex:1" id="again">Ещё раз</button></div>
     </div>`;
     document.querySelectorAll('.stars span').forEach((el) => { const k = +el.dataset.k; if (k < stars) setTimeout(() => el.classList.add('on'), 250 + k * 280); });
@@ -697,6 +700,7 @@ async function vMe() {
     <div class="row between"><span></span><button class="btn sm ghost" id="out2">Выйти</button></div>
     <div class="prof"><div class="ava xl" style="--p:${L.pct}"><b>${esc(initials(S.me.full_name))}</b></div>
       <div class="h1">${esc(S.me.full_name)}</div><div class="muted small">${POS[S.me.position] || ''}, ${esc(r?.name || '')}</div></div>
+    ${isAdmin() ? '' : '<a class="pathban" href="#/path"><span class="e">🗺️</span><div><b>Карта развития</b><small>Путь от новичка до эксперта и аттестации</small></div><span class="go">›</span></a>'}
     <div class="lvlcard"><div class="row between"><span class="lv">${L.icon} ${L.name}</span><b>⭐ ${S.stats.total}</b></div><div class="bar"><i style="width:${L.pct}%"></i></div>
       <span class="small" style="opacity:.9">${L.next ? `До уровня «${L.next[1]}» — ${L.next[0] - S.stats.total} баллов` : 'Максимальный уровень'}</span></div>
     <div class="tiles"><div class="tile" style="min-height:auto"><span class="e">🔥</span><b>${S.stats.streak} ${plural(S.stats.streak, 'день', 'дня', 'дней')} подряд</b></div><div class="tile" style="min-height:auto"><span class="e">🏆</span><b>${got} из ${badges().length} наград</b></div></div>
@@ -735,7 +739,7 @@ function codeModal(name, phone, code) {
 const AGROUPS = [
   ['dash', 'Сводка', [['dash', 'Сводка']]],
   ['control', 'SERVICE CONTROL', [['control', 'SERVICE CONTROL']]],
-  ['team', 'Команда', [['staff', 'Сотрудники'], ['progress', 'Прогресс']]],
+  ['team', 'Команда', [['staff', 'Сотрудники'], ['progress', 'Прогресс'], ['certs', 'Карта развития и аттестации']]],
   ['learn', 'Обучение', [['materials', 'Мои материалы'], ['assign', 'Задания и сообщения'], ['spot', 'Игра «Найди ошибку»'], ['questions', 'Вопросы'], ['quests', 'Квесты и симуляторы']]],
   ['fun', 'Вовлечение', [['compete', 'Соревнования'], ['news', 'Новости'], ['shop', 'Магазин'], ['cast', 'Шефи']]],
 ];
@@ -752,6 +756,7 @@ async function vAdmin(tab, arg) {
   if (tab === 'assign') return aAssign(ctx(), ab);
   if (tab === 'materials') return aMaterials(ctx(), ab);
   if (tab === 'spot') return aSpot(ctx(), ab);
+  if (tab === 'certs') return aCerts(ctx(), ab);
   if (tab === 'staff') return aStaff(ab);
   if (tab === 'questions') return aQuestions(ab, arg);
   if (tab === 'progress') return aProgress(ab);

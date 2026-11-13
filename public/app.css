@@ -719,3 +719,24 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .spot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .spot-it{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:10px}.spot-it.off{opacity:.5}
 .game.g-build{border-color:var(--acc2)}.game.g-spot{border-color:var(--acc)}
+
+/* ---------- карта развития ---------- */
+.pathban{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--r-md);background:var(--hero);color:#fff;text-decoration:none}
+.pathban .e{font-size:28px}.pathban div{flex:1;display:flex;flex-direction:column}.pathban small{opacity:.85}.pathban .go{font-size:26px}
+.path-hero{display:flex;gap:12px;align-items:center;background:var(--hero);color:#fff;border-radius:var(--r-lg);padding:14px}
+.path-hero>div:last-child{flex:1;display:flex;flex-direction:column;gap:6px}.path-hero small{opacity:.85;font-weight:700}
+.path-hero .bar{background:rgba(255,255,255,.25)}.path-hero .bar i{background:#fff}
+.ph-ch{width:90px;height:104px;flex:none;margin:-8px 0 -12px -4px}
+.road{position:relative;display:flex;flex-direction:column;gap:18px;padding:8px 0}
+.road::before{content:"";position:absolute;left:50%;top:10px;bottom:10px;width:6px;margin-left:-3px;border-radius:3px;background:repeating-linear-gradient(var(--line) 0 14px,transparent 14px 24px)}
+.stn{position:relative;display:flex;align-items:flex-start;gap:12px;width:calc(50% + 28px)}
+.stn.l{align-self:flex-start;flex-direction:row-reverse;text-align:right}.stn.r{align-self:flex-end}
+.stn .dot{flex:none;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:24px;background:var(--card2);border:3px solid var(--line);z-index:1}
+.stn.done .dot{background:var(--ok);border-color:var(--ok);color:#fff;font-weight:900}
+.stn.cur .dot{background:var(--acc2);border-color:var(--acc2);box-shadow:0 0 0 8px color-mix(in srgb,var(--acc2) 25%,transparent);animation:pulse 1.8s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 14px color-mix(in srgb,var(--acc2) 8%,transparent)}}
+.stn .sc{flex:1;display:flex;flex-direction:column;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px;min-width:0}
+.stn.cur .sc{border:2px solid var(--acc2)}.stn.lock .sc{opacity:.6}
+.stn .sc small{color:var(--muted);font-weight:700}.stn .sc .btn{margin-top:6px}
+.ri{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13px;text-align:left}.ri .bar{height:8px}
+@media (max-width:520px){.road::before{left:28px}.stn,.stn.l,.stn.r{width:100%;align-self:stretch;flex-direction:row;text-align:left}}
