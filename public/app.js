@@ -2,6 +2,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 import { vQuest, vSim, questCard, loadDone, loadQuests } from './quest.js';
 import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.js';
+import { vTeam, feedUnread } from './team.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
 const SB_KEY = 'sb_publishable_pkhdRyL8FhjAHaKgXmuh6Q_Oi0zlZ9S';
@@ -10,7 +11,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Менеджер' };
-const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -45,6 +46,7 @@ const IC = {
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-6a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h7z"/></svg>',
   rating: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>',
   me: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>',
+  team: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.6 5.2"/></svg>',
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
 };
 
@@ -121,13 +123,14 @@ async function loadBase() {
   S.quests = await loadQuests(sb, S.concept); S.mainQuest = S.quests.find((q) => q.kind === 'quest');
   S.quest = await loadDone(sb, S.me.id, S.mainQuest?.id);
   const { data: ach } = await sb.from('achievements').select('*').eq('user_id', S.me.id); S.ach = ach || [];
+  S.unread = await feedUnread(sb, S.concept);
 }
 
 function tabs(cur) {
-  const t = [['home', 'Главная'], ['learn', 'Обучение'], ['book', 'Книга'], ['rating', 'Рейтинг'], ['me', 'Профиль']];
+  const t = [['home', 'Главная'], ['learn', 'Обучение'], ['team', 'Команда'], ['book', 'Книга'], ['me', 'Профиль']];
   if (isAdmin()) t.push(['admin', 'Кабинет']);
   $tabs.hidden = false;
-  $tabs.innerHTML = t.map(([k, n]) => `<a href="#/${k}" class="${cur === k ? 'on' : ''}">${IC[k]}<span>${n}</span></a>`).join('');
+  $tabs.innerHTML = t.map(([k, n]) => `<a href="#/${k}" class="${cur === k ? 'on' : ''}">${IC[k]}<span>${n}</span>${k === 'team' && S.unread && cur !== 'team' ? `<i class="dotn">${S.unread > 9 ? '9+' : S.unread}</i>` : ''}</a>`).join('');
 }
 
 async function route() {
@@ -149,7 +152,8 @@ async function route() {
     if (r === 'quest') { $tabs.hidden = true; return await vQuest(ctx(), p[1] ? decodeURIComponent(p[1]) : S.mainQuest?.id); }
     if (r === 'sim') { $tabs.hidden = true; return await vSim(ctx(), decodeURIComponent(p[1])); }
     if (r === 'book') { tabs('book'); return await vBook(p[1]); }
-    if (r === 'rating') { tabs('rating'); return await vRating(p[1] || 'month'); }
+    if (r === 'team') { tabs('team'); return await vTeam(ctx()); }
+    if (r === 'rating') { tabs('team'); return await vRating(p[1] || 'month'); }
     if (r === 'me') { tabs('me'); return await vMe(); }
     if (r === 'admin' && isAdmin()) { tabs('admin'); return await vAdmin(p[1] || 'staff', p[2] ? decodeURIComponent(p[2]) : undefined); }
     location.hash = '#/home';
@@ -198,6 +202,7 @@ async function vHome() {
     <div class="goal"><div class="ring" style="--p:${gp}"><span>${S.today}/${GOAL}</span></div>
       <div><b>${gp >= 100 ? 'Цель дня выполнена 🎉' : 'Цель дня — 30 баллов'}</b><span class="small muted">${gp >= 100 ? 'Серия продолжается. Завтра — новая цель' : 'Урок, квиз или блиц — и серия не прервётся'}</span></div></div>
     <a class="shopban" href="#/shop"><span class="e">🎁</span><div><b>Магазин наград</b><small>На счету ⭐ ${s.balance ?? s.total} — обменяй на кофе или десерт</small></div><span class="go">›</span></a>
+    <a class="teamban" href="#/team"><span class="e">👋</span><div><b>Лента команды</b><small>${S.unread ? `Новых записей: ${S.unread}` : 'Фото смены, поздравления, «спасибо коллеге»'}</small></div>${S.unread ? `<i class="dotn">${S.unread > 9 ? '9+' : S.unread}</i>` : '<span class="go">›</span>'}</a>
     ${s.due ? `<a class="tile hot" href="#/play/review" style="min-height:auto;flex-direction:row;align-items:center;gap:14px;justify-content:flex-start"><span class="e">🔁</span><div><b>Повторить ${s.due} ${plural(s.due, 'вопрос', 'вопроса', 'вопросов')}</b><div class="small muted">Освежи, пока не забылось</div></div></a>` : ''}
     <div class="sec-t"><span class="h2">Меню знаний</span><a href="#/learn">Все</a></div>
     <div class="plates">${S.blocks.map((b, i) => `<a class="plate" href="#/block/${encodeURIComponent(b.id)}"><div class="pl" style="--p:${pctOf(b.id)}"><div>${plateImg(b, i)}</div></div><b>${esc(b.title)}</b></a>`).join('')}</div>
@@ -633,7 +638,7 @@ async function vRating(per) {
   $app.innerHTML = h`
   <div class="stack">
     ${isAdmin() ? conceptSwitch() : ''}
-    <div class="h1">Рейтинг ${S.concept === 'grano' ? 'GRANO' : 'VILKA'}</div>
+    <div class="row"><a class="back" href="#/team">‹</a><div class="h1">Рейтинг ${S.concept === 'grano' ? 'GRANO' : 'VILKA'}</div></div>
     <div class="seg" id="per"><button data-p="month" class="${per === 'month' ? 'on' : ''}">Этот месяц</button><button data-p="all" class="${per === 'all' ? 'on' : ''}">За всё время</button></div>
     ${top.length ? `<div class="podium">${pod.map(([r, m, c]) => r ? `<div class="pc ${c}"><div class="av" data-m="${m}">${esc(initials(r.name))}</div><div class="base"><b>${esc(r.name)}</b><span class="small muted">${esc(r.restaurant.replace('VILKA ', ''))}</span><span class="pt">${r.points}</span></div></div>` : '<span></span>').join('')}</div>`
       : `<div class="today" style="min-height:180px"><span class="k">Рейтинг пока пуст</span><span class="t">Первый урок — и ты на вершине</span><a class="btn gold go" href="#/learn">Начать</a></div>`}
@@ -720,10 +725,11 @@ async function aStaff(ab) {
   <form class="card stack" id="nf"><b>Добавить сотрудника</b>
     <div class="grid2"><input id="fn" placeholder="Имя и фамилия" required><input id="fp" type="tel" placeholder="Телефон 8 7__ ___ __ __" required>
     <select id="fr">${rests.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
-    <select id="fpos">${Object.entries(POS).filter(([k]) => k !== 'manager').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+    <select id="fpos">${Object.entries(POS).filter(([k]) => k !== 'manager').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+    <label class="small muted" style="display:flex;flex-direction:column;gap:4px">День рождения (необязательно)<input id="fbd" type="date"></label></div>
     <button class="btn" id="nb">Добавить и выдать код</button></form>
   <div class="tw"><table class="t"><tr><th>Сотрудник</th><th>Точка</th><th>Был(а)</th><th></th></tr>
-  ${list.map((p) => `<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b>${p.role === 'admin' ? ' <span class="pill acc">админ</span>' : ''}<div class="small muted">${POS[p.position] || ''} · ${fmtPhone(p.phone)}</div></td>
+  ${list.map((p) => `<tr style="${p.active ? '' : 'opacity:.5'}"><td><b>${esc(p.full_name)}</b>${p.role === 'admin' ? ' <span class="pill acc">админ</span>' : ''}<div class="small muted">${POS[p.position] || ''} · ${fmtPhone(p.phone)}</div>${p.role === 'admin' ? '' : `<label class="bdl small muted">🎂 <input type="date" data-bd="${p.id}" value="${p.birthday || ''}"></label>`}</td>
     <td class="small">${esc(S.rests.find((r) => r.id === p.restaurant_id)?.name || '')}</td>
     <td class="small muted">${p.last_seen_at ? new Date(p.last_seen_at).toLocaleDateString('ru-RU') : 'не входил(а)'}</td>
     <td>${p.role === 'admin' ? '' : `<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ghost" data-reset="${p.id}">Новый код</button><button class="btn sm ghost" data-act="${p.id}" data-on="${p.active ? 0 : 1}">${p.active ? 'Отключить' : 'Включить'}</button></div>`}</td></tr>`).join('')}
@@ -732,9 +738,11 @@ async function aStaff(ab) {
     e.preventDefault(); const b = document.getElementById('nb'); b.disabled = true;
     try {
       const r = await adminCall({ action: 'create', full_name: fn.value, phone: fp.value, restaurant_id: fr.value, position: fpos.value });
+      if (fbd.value) await sb.from('profiles').update({ birthday: fbd.value }).eq('phone', r.phone);
       codeModal(fn.value, r.phone, r.code); aStaff(ab);
     } catch (er) { toast(er.message); b.disabled = false; }
   };
+  ab.querySelectorAll('[data-bd]').forEach((i) => i.onchange = async () => { const { error } = await sb.from('profiles').update({ birthday: i.value || null }).eq('id', i.dataset.bd); toast(error ? error.message : 'День рождения сохранён'); });
   ab.querySelectorAll('[data-reset]').forEach((b) => b.onclick = async () => {
     const p = list.find((x) => x.id === b.dataset.reset);
     if (!(await ask(`Выдать новый код для ${p.full_name}? Старый перестанет работать.`, 'Выдать код'))) return;
