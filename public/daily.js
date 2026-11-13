@@ -2,12 +2,24 @@
 import { Character } from './characters.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export async function mountDaily(ctx, el) {
+export async function mountDaily(ctx, el, compact) {
   const { sb, S } = ctx;
   const { data: q } = await sb.rpc('daily_question', { p_concept: S.concept });
   if (!q || !el) return;
-  let ch;
+  let ch, open = !compact;
   const draw = (q) => {
+    if (!open && !q.answered) {
+      el.innerHTML = `<button class="daily dq-min"><div class="dq-ch"></div><div><small>Вопрос дня от Шефи · +5 ⭐${q.streak ? ` · 🔥 ${q.streak}` : ''}</small><b>${esc(q.question)}</b></div><span class="dq-go">Ответить</span></button>`;
+      if (ch) ch.destroy(); ch = new Character(el.querySelector('.dq-ch'), 'shefi', 'doubt');
+      el.querySelector('.dq-min').onclick = () => { open = true; draw(q); };
+      return;
+    }
+    if (!open && q.answered) {
+      el.innerHTML = `<button class="daily dq-min ${q.correct ? 'ok' : 'bad'}"><div class="dq-ch"></div><div><small>Вопрос дня · ${q.correct ? 'верно, +5 ⭐' : 'попытка засчитана, +1 ⭐'}</small><b>${q.team?.n ? `Команда: верно ${q.team.ok} из ${q.team.n}` : 'Новый вопрос — завтра'}</b></div><span class="dq-go">Разбор</span></button>`;
+      if (ch) ch.destroy(); ch = new Character(el.querySelector('.dq-ch'), 'shefi', q.correct ? 'praise' : 'calm');
+      el.querySelector('.dq-min').onclick = () => { open = true; draw(q); };
+      return;
+    }
     const done = q.answered;
     el.innerHTML = `<div class="daily ${done ? (q.correct ? 'ok' : 'bad') : ''}">
       <div class="dq-h"><div class="dq-ch"></div><div><small>Вопрос дня от Шефи${q.streak ? ` · 🔥 ${q.streak} ${q.streak === 1 ? 'день' : q.streak < 5 ? 'дня' : 'дней'} подряд` : ''}</small><b>${esc(q.question)}</b></div></div>

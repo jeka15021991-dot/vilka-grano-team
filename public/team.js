@@ -41,7 +41,7 @@ export async function vTeam(ctx) {
     <div class="row between"><div class="h1">Команда</div><div class="row" style="gap:6px"><a class="chip" href="#/compete">⚔️ Битва</a><a class="chip gem" href="#/rating">🏆 Рейтинг</a></div></div>
     <div class="compose">
       <button class="cp-main" id="cpPost"><span class="ava sm"><b>${esc(ini(S.me.full_name))}</b></span><span class="muted">Поделиться с командой…</span><span class="cp-ph">📷</span></button>
-      <button class="cp-thx" id="cpThx"><span>🙏</span><b>Спасибо коллеге</b><small>+10 баллов ему</small></button>
+      <button class="cp-thx" id="cpThx"><span>🙏</span><b>Рахмет коллеге</b><small>+10 баллов ему</small></button>
     </div>
     ${soon.length ? `<div class="soon"><span class="small muted">Скоро день рождения</span>${soon.map(([p, d]) => `<span class="sb"><b>${esc(first(p.full_name))}</b> ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>`).join('')}</div>` : ''}
     <div id="feed" class="feed"></div>
@@ -49,12 +49,13 @@ export async function vTeam(ctx) {
   </div>`;
   document.getElementById('cpPost').onclick = () => composer();
   document.getElementById('cpThx').onclick = () => thanks();
+  try { if (sessionStorage.getItem('vg_thx')) { sessionStorage.removeItem('vg_thx'); setTimeout(thanks, 300); } } catch (e) {}
   draw();
 }
 
 function draw() {
   const box = document.getElementById('feed'); if (!box) return;
-  box.innerHTML = posts.length ? posts.map(card).join('') : `<div class="empty-feed"><div class="ef-ch"></div><b>Здесь пока тихо</b><p class="muted small">Поблагодари коллегу или поделись фото смены — ты будешь первым.</p></div>`;
+  box.innerHTML = posts.length ? posts.map(card).join('') : `<div class="empty-feed"><div class="ef-ch"></div><b>Здесь пока тихо</b><p class="muted small">Скажи рахмет коллеге или поделись фото смены — ты будешь первым.</p></div>`;
   if (!posts.length) new Character(box.querySelector('.ef-ch'), 'shefi', 'invite');
   box.querySelectorAll('.bd-ch').forEach((el) => { const c = new Character(el, 'shefi', 'victory'); setTimeout(() => c.react('victory'), 400); });
   bind(box);
@@ -80,7 +81,7 @@ function card(p) {
       <span class="small muted">${esc(sub(p.to_pos, p.to_rest))}</span></div></div>
       <p class="small">${p.to_user === C.S.me.id ? 'С днём рождения! Команда дарит тебе ⭐ 50 баллов. Загляни в комментарии 💛' : 'Поздравь коллегу в комментариях — ему будет приятно!'}</p>`;
   } else if (p.kind === 'thanks') {
-    inner = head(p) + `<div class="thx"><div class="thx-to"><span>🙏 Спасибо</span><b>${esc(p.to_name)}</b><small>${esc(sub(p.to_pos, p.to_rest))}</small></div>
+    inner = head(p) + `<div class="thx"><div class="thx-to"><span>🙏 Рахмет</span><b>${esc(p.to_name)}</b><small>${esc(sub(p.to_pos, p.to_rest))}</small></div>
       <p>${linkify(p.body)}</p><span class="thx-pt">+10 ⭐</span></div>`;
   } else {
     inner = head(p) + (p.body ? `<p class="pb">${linkify(p.body)}</p>` : '') + (p.photo ? `<img class="pi" src="${esc(p.photo)}" alt="" loading="lazy">` : '');
@@ -202,12 +203,12 @@ function thanks() {
   const { S, sb } = C;
   const list = people.filter((p) => p.id !== S.me.id && p.role !== 'admin');
   if (!list.length) return C.toast('Коллеги появятся, когда сервис-менеджер их добавит');
-  const m = sheet(`<div class="row between"><b class="h2">Спасибо коллеге</b><button class="pm" data-x aria-label="Закрыть">✕</button></div>
-    <p class="small muted">Коллега получит ⭐ 10 баллов, а вся команда увидит, за что. В день можно сказать 3 спасибо.</p>
+  const m = sheet(`<div class="row between"><b class="h2">Рахмет коллеге</b><button class="pm" data-x aria-label="Закрыть">✕</button></div>
+    <p class="small muted">Коллега получит ⭐ 10 баллов, а вся команда увидит, за что. В день можно сказать 3 рахмета.</p>
     <input id="tq" placeholder="Найти по имени" autocomplete="off">
     <div class="who-list" id="tl"></div>
-    <textarea id="tt" rows="3" maxlength="300" placeholder="За что спасибо? Например: подменил на смене, помог с банкетом"></textarea>
-    <button class="btn block gold" id="tgo" disabled>Сказать спасибо</button>`);
+    <textarea id="tt" rows="3" maxlength="300" placeholder="За что рахмет? Например: подменил на смене, помог с банкетом"></textarea>
+    <button class="btn block gold" id="tgo" disabled>Сказать рахмет</button>`);
   let pick = null;
   const drawList = () => {
     const q = m.querySelector('#tq').value.trim().toLowerCase();
@@ -222,7 +223,7 @@ function thanks() {
     if (error) { C.toast(error.message); e.target.disabled = false; return; }
     const who = first(list.find((p) => p.id === pick)?.full_name);
     m.remove(); C.confetti();
-    coach({ concept: S.concept, mood: 'praise', text: `Спасибо отправлено! ${who} получит ⭐ 10 баллов. Добрые слова делают смену лучше.`, duration: 4500 });
+    coach({ concept: S.concept, mood: 'praise', text: `Рахмет отправлен! ${who} получит ⭐ 10 баллов. Добрые слова делают смену лучше.`, duration: 4500 });
     vTeam(C);
   };
 }

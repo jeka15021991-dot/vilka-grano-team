@@ -10,6 +10,7 @@ import { aMaterials, videoEmbed } from './materials.js';
 import { mountDaily } from './daily.js';
 import { vBuild, vSpot, aSpot } from './games.js';
 import { vPath, aCerts } from './path.js';
+import { mountStories, gamesRow, mountFeedPreview } from './home.js';
 import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments, homeBrief, publicBrief, homeSummary, bindHomeSummary } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
@@ -19,7 +20,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Администратор' };
-const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', exam: 'Аттестация', game_build: 'Игра «Собери блюдо»', game_spot: 'Игра «Найди ошибку»', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Рахмет от коллеги', challenge: 'Задание выполнено', daily: 'Вопрос дня', exam: 'Аттестация', game_build: 'Игра «Собери блюдо»', game_spot: 'Игра «Найди ошибку»', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -189,61 +190,45 @@ function nextBlock() {
   return S.blocks.find((b) => (S.stats.questions[b.id] || 0) > 0 && !st[b.id]?.passed)
     || S.blocks.find((b) => !st[b.id]?.lesson) || null;
 }
+function hello() { const hr = new Date().getHours(); return hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер'; }
 function topBar() {
   const L = level(S.stats.total);
   return `<div class="top"><a class="ava" href="#/me" style="--p:${L.pct}" aria-label="Профиль"><b>${esc(initials(S.me.full_name))}</b></a>
-    <div class="who"><span class="small muted">${L.icon} ${L.name}</span><b>${esc(S.me.full_name.split(' ')[0])}</b></div>
+    <div class="who"><span class="small muted">${L.icon} ${L.name}</span><b>${hello()}, ${esc(S.me.full_name.split(' ')[0])}!</b></div>
     <span class="chip fire" title="Дней подряд">🔥 ${S.stats.streak}</span><a class="chip gem" href="#/shop" title="Баллы на счету">⭐ ${S.stats.balance ?? S.stats.total}</a></div>`;
 }
 async function vHome() {
   const s = S.stats, nb = nextBlock();
-  const { data: news } = await sb.from('news').select('*').or(`concept.is.null,concept.eq.${S.concept}`).order('created_at', { ascending: false }).limit(5);
-  const { data: reads } = await sb.from('news_reads').select('news_id').eq('user_id', S.me.id);
-  const rd = new Set((reads || []).map((r) => r.news_id));
   const gp = Math.min(100, Math.round(100 * S.today / GOAL));
   const firstName = S.me.full_name.split(' ')[0];
-  const hero = nb
-    ? `<a class="today" href="#/block/${encodeURIComponent(nb.id)}">${S.covers[nb.id] ? `<img src="${esc(S.covers[nb.id])}" alt="">` : ''}
-        <span class="k">${stepText(nb.id)}</span><span class="t">${esc(nb.title)}</span><span class="btn gold go">${(s.blocks[nb.id] || {}).lesson ? 'Продолжить' : 'Начать'}</span></a>`
-    : `<div class="today">${Object.values(S.covers)[0] ? `<img src="${esc(Object.values(S.covers)[0])}" alt="">` : ''}<span class="k">${firstName}, всё пройдено</span><span class="t">Ты знаешь меню лучше всех</span><a class="btn gold go" href="#/play/speed">Сыграть в блиц</a></div>`;
+  const cover = nb ? S.covers[nb.id] : Object.values(S.covers)[0];
+  const hero = `<a class="hero2" href="${nb ? '#/block/' + encodeURIComponent(nb.id) : '#/play/speed'}">${cover ? `<img src="${esc(cover)}" alt="">` : ''}
+      <div class="h2-ring ring" style="--p:${gp}"><span>${S.today}<small>/${GOAL}</small></span></div>
+      <span class="k">${nb ? (s.blocks[nb.id] || {}).lesson ? 'Продолжить обучение' : 'Следующий раздел' : `${firstName}, всё пройдено`} · ${nb ? stepText(nb.id) : 'ты знаешь меню лучше всех'}</span>
+      <span class="t">${nb ? esc(nb.title) : 'Сыграй в блиц'}</span>
+      <span class="h2-row"><span class="btn gold">${nb ? ((s.blocks[nb.id] || {}).lesson ? 'Продолжить' : 'Начать') : 'Играть'} ›</span><small>${gp >= 100 ? 'Цель дня выполнена 🎉' : `Цель дня: ещё ${GOAL - S.today} баллов`}</small></span></a>`;
   $app.innerHTML = h`
-  <div class="stack">
+  <div class="stack home2">
     ${topBar()}
     ${isAdmin() ? conceptSwitch() : ''}
-    <div class="big3">
-      <a class="b3 b3-learn" href="#/learn"><span class="e">🎓</span><b>Учиться</b><small>${S.blocks.length} разделов</small></a>
-      <a class="b3 b3-play" href="#/games"><span class="e">🎮</span><b>Играть</b><small>квест, блиц</small></a>
-      <a class="b3 b3-rate" href="#/rating"><span class="e">🏆</span><b>Рейтинг</b><small>${S.stats.month} за месяц</small></a>
+    <div class="stories" id="stories"><span class="st sk"></span><span class="st sk"></span><span class="st sk"></span><span class="st sk"></span></div>
+    <div id="bdband"></div>
+    ${hero}
+    <div class="quick">
+      <a href="#/learn"><span>🎓</span>Учиться</a><a href="#/book"><span>📖</span>Книга</a><a href="#/rating"><span>🏆</span>Рейтинг</a><a href="#/shop"><span>🎁</span>Магазин</a>
     </div>
     <div id="daily"></div>
-    <div id="sumr"></div>
-    <div id="brf"></div>
-    <div id="asgn"></div>
-    ${S.mainQuest && S.quest.size < S.mainQuest.steps.length ? questCard(S.mainQuest, S.quest) : ''}
-    ${hero}
-    <div class="goal"><div class="ring" style="--p:${gp}"><span>${S.today}/${GOAL}</span></div>
-      <div><b>${gp >= 100 ? 'Цель дня выполнена 🎉' : 'Цель дня — 30 баллов'}</b><span class="small muted">${gp >= 100 ? 'Серия продолжается. Завтра — новая цель' : 'Урок, квиз или блиц — и серия не прервётся'}</span></div></div>
-    <a class="shopban" href="#/shop"><span class="e">🎁</span><div><b>Магазин наград</b><small>На счету ⭐ ${s.balance ?? s.total} — обменяй на кофе или десерт</small></div><span class="go">›</span></a>
-    <a class="teamban comp" href="#/compete" id="compBan"><span class="e">⚔️</span><div><b>Задания недели</b><small>Битва ресторанов и награды</small></div><span class="go">›</span></a>
-    <a class="teamban" href="#/team"><span class="e">👋</span><div><b>Лента команды</b><small>${S.unread ? `Новых записей: ${S.unread}` : 'Фото смены, поздравления, «спасибо коллеге»'}</small></div>${S.unread ? `<i class="dotn">${S.unread > 9 ? '9+' : S.unread}</i>` : '<span class="go">›</span>'}</a>
-    ${s.due ? `<a class="tile hot" href="#/play/review" style="min-height:auto;flex-direction:row;align-items:center;gap:14px;justify-content:flex-start"><span class="e">🔁</span><div><b>Повторить ${s.due} ${plural(s.due, 'вопрос', 'вопроса', 'вопросов')}</b><div class="small muted">Освежи, пока не забылось</div></div></a>` : ''}
-    <div class="sec-t"><span class="h2">Меню знаний</span><a href="#/learn">Все</a></div>
-    <div class="plates">${S.blocks.map((b, i) => `<a class="plate" href="#/block/${encodeURIComponent(b.id)}"><div class="pl" style="--p:${pctOf(b.id)}"><div>${plateImg(b, i)}</div></div><b>${esc(b.title)}</b></a>`).join('')}</div>
-    <a class="tile" href="#/book" style="min-height:auto;flex-direction:row;align-items:center;gap:14px;justify-content:flex-start"><span class="e">📖</span><div><b>Вкусная книга</b><div class="small muted">Блюда, составы, сервис — с поиском</div></div></a>
-    ${(news || []).length ? `<div class="sec-t"><span class="h2">Новости</span></div>` + news.map((n) => `<div class="news ${rd.has(n.id) ? '' : 'unread'}"><b>${esc(n.title)}</b>${n.body ? `<span class="small">${esc(n.body)}</span>` : ''}<span class="small muted">${new Date(n.created_at).toLocaleDateString('ru-RU')}</span></div>`).join('') : ''}
+    <div class="sec-t"><span class="h2">Играть</span><a href="#/games">Все игры</a></div>
+    ${gamesRow(S)}
+    <div class="sec-t"><span class="h2">Команда</span><a href="#/team">Лента${S.unread ? ` <i class="dotn" style="position:static;display:inline-grid">${S.unread > 9 ? '9+' : S.unread}</i>` : ''}</a></div>
+    <div class="fprev" id="fprev"><div class="spin" style="width:24px;height:24px"></div></div>
   </div>`;
-  const unread = (news || []).filter((n) => !rd.has(n.id));
-  { const el = document.querySelector('.qx-m'); if (el) { const c = new Character(el, 'shefi', 'invite'); setTimeout(() => c.react('invite'), 700); } }
   if (!tour()) greetDaily(nb);
-  if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
-  mountDaily(ctx(), document.getElementById('daily'));
-  if (!isAdmin()) homeSummary(ctx()).then((html) => { const el = document.getElementById('sumr'); if (el && html) { el.innerHTML = html; bindHomeSummary(ctx()); } });
-  homeBrief(ctx()).then((html) => { const el = document.getElementById('brf'); if (el && html) el.innerHTML = html; });
-  if (!isAdmin()) homeAssignments(ctx()).then((html) => { const el = document.getElementById('asgn'); if (el && html) { el.innerHTML = html; bindHomeAssignments(ctx()); } });
-  compeSummary(sb, S.concept).then((x) => { const el = document.getElementById('compBan'); if (!x || !el) return;
-    el.querySelector('small').textContent = x.claim ? 'Есть награда — забери!' : `Выполнено ${x.done} из ${x.total} · битва ресторанов`;
-    if (x.claim) el.classList.add('hot'); });
+  mountStories(ctx(), document.getElementById('stories'), document.getElementById('bdband'));
+  mountDaily(ctx(), document.getElementById('daily'), true);
+  mountFeedPreview(ctx(), document.getElementById('fprev'));
+  if (window.gsap) window.gsap.from('.hero2, .quick a, .gc', { y: 18, opacity: 0, stagger: 0.04, duration: 0.4, ease: 'power2.out', clearProps: 'all' });
 }
 const TOUR = [
   { mood: 'invite', t: 'Привет, NAME!', x: 'Я Шефи — твой наставник. За минуту покажу, как здесь всё устроено.' },

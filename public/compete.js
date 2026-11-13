@@ -3,8 +3,8 @@ import { Character, coach } from './characters.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const short = (n) => String(n || '').replace(/^VILKA\s+/, '');
-const METRIC = { points: 'баллов', lessons: 'уроков', tests: 'тестов', days: 'дней', speed: 'блицев', review: 'повторений', thanks: 'спасибо', quests: 'квестов' };
-const METRIC_FULL = { points: 'Баллы', lessons: 'Изученные уроки', tests: 'Сданные тесты', days: 'Активные дни', speed: 'Сыгранные блицы', review: 'Повторения', thanks: 'Спасибо коллегам', quests: 'Пройденные квесты' };
+const METRIC = { points: 'баллов', lessons: 'уроков', tests: 'тестов', days: 'дней', speed: 'блицев', review: 'повторений', thanks: 'рахметов', quests: 'квестов' };
+const METRIC_FULL = { points: 'Баллы', lessons: 'Изученные уроки', tests: 'Сданные тесты', days: 'Активные дни', speed: 'Сыгранные блицы', review: 'Повторения', thanks: 'Рахмет коллегам', quests: 'Пройденные квесты' };
 const daysLeft = (d) => Math.max(0, Math.ceil((new Date(d + 'T23:59:59+05:00') - Date.now()) / 864e5));
 const dl = (n) => n === 0 ? 'последний день' : n === 1 ? 'остался 1 день' : (n < 5 ? `осталось ${n} дня` : `осталось ${n} дней`);
 
@@ -97,7 +97,7 @@ async function claim(id, b) {
 /* ---------- кабинет ---------- */
 const TPL = [
   ['🔥', 'Набери 150 баллов', 'points', 150], ['🎓', 'Изучи 3 урока', 'lessons', 3], ['✅', 'Сдай 2 теста', 'tests', 2], ['📅', '5 дней из 7', 'days', 5],
-  ['⚡', 'Сыграй 5 блицев', 'speed', 5], ['🙏', 'Скажи 3 спасибо', 'thanks', 3], ['🗺️', 'Пройди квест', 'quests', 1],
+  ['⚡', 'Сыграй 5 блицев', 'speed', 5], ['🙏', 'Скажи 3 рахмета', 'thanks', 3], ['🗺️', 'Пройди квест', 'quests', 1],
 ];
 export async function aCompete(ctx, ab) {
   C = ctx; const { sb, S, toast, ask } = ctx;
