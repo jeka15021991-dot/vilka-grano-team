@@ -61,7 +61,7 @@ function drawCols() {
       <div class="cb"><i style="height:${h}%">${win ? '<em>👑</em>' : ''}</i></div>
       <b>${esc(short(r.name))}</b><small>${r.staff ? `${r.staff} чел.` : 'нет участников'}${me ? ' · вы' : ''}</small></div>`;
   }).join('');
-  if (window.gsap) window.gsap.from('#cols .cb i', { height: 0, duration: .9, stagger: .08, ease: 'power3.out' });
+  if (window.gsap) window.gsap.from('#cols .cb i', { scaleY: 0, transformOrigin: '50% 100%', duration: .9, stagger: .08, ease: 'power3.out' });
   void rows;
 }
 
