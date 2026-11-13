@@ -38,7 +38,7 @@ export async function vTeam(ctx) {
   for (let i = 1; i <= 7; i++) { const d = new Date(today); d.setDate(d.getDate() + i); people.filter((p) => p.bday === md(d)).forEach((p) => soon.push([p, d])); }
 
   $app.innerHTML = `<div class="stack">
-    <div class="row between"><div class="h1">Команда</div><a class="chip gem" href="#/rating">🏆 Рейтинг</a></div>
+    <div class="row between"><div class="h1">Команда</div><div class="row" style="gap:6px"><a class="chip" href="#/compete">⚔️ Битва</a><a class="chip gem" href="#/rating">🏆 Рейтинг</a></div></div>
     <div class="compose">
       <button class="cp-main" id="cpPost"><span class="ava sm"><b>${esc(ini(S.me.full_name))}</b></span><span class="muted">Поделиться с командой…</span><span class="cp-ph">📷</span></button>
       <button class="cp-thx" id="cpThx"><span>🙏</span><b>Спасибо коллеге</b><small>+10 баллов ему</small></button>

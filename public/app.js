@@ -3,6 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { vQuest, vSim, questCard, loadDone, loadQuests } from './quest.js';
 import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.js';
 import { vTeam, feedUnread } from './team.js';
+import { vCompete, aCompete, compeSummary } from './compete.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
 const SB_KEY = 'sb_publishable_pkhdRyL8FhjAHaKgXmuh6Q_Oi0zlZ9S';
@@ -11,7 +12,7 @@ const sb = createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefr
 const CONTACT = { who: 'Евгения Борисовна, сервис-менеджер VILKA и GRANO', tel: '8 777 521 89 09' };
 const LEVELS = [[0, 'Новичок', '🌱'], [150, 'Стажёр', '🍽️'], [400, 'Знаток', '📖'], [800, 'Профи', '⭐'], [1500, 'Эксперт', '🔥'], [2500, 'Гуру', '👑']];
 const POS = { waiter: 'Официант', bartender: 'Бармен', hostess: 'Хостес', manager: 'Менеджер' };
-const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', birthday: 'Подарок на день рождения' };
+const REASON = { shop: 'Магазин наград', refund: 'Возврат баллов', quest: 'Квест: этап', quest_done: 'Квест пройден', lesson: 'Урок изучен', item: 'Новый верный ответ', review: 'Повторение', quiz: 'Квиз пройден', test: 'Тест сдан', day: 'Активный день', review_done: 'Повторение дня', speed: 'Блиц', bonus: 'Бонус', thanks: 'Спасибо от коллеги', challenge: 'Задание выполнено', review_done: 'Повторение дня', birthday: 'Подарок на день рождения' };
 
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabs');
@@ -153,6 +154,7 @@ async function route() {
     if (r === 'sim') { $tabs.hidden = true; return await vSim(ctx(), decodeURIComponent(p[1])); }
     if (r === 'book') { tabs('book'); return await vBook(p[1]); }
     if (r === 'team') { tabs('team'); return await vTeam(ctx()); }
+    if (r === 'compete') { tabs('team'); return await vCompete(ctx()); }
     if (r === 'rating') { tabs('team'); return await vRating(p[1] || 'month'); }
     if (r === 'me') { tabs('me'); return await vMe(); }
     if (r === 'admin' && isAdmin()) { tabs('admin'); return await vAdmin(p[1] || 'staff', p[2] ? decodeURIComponent(p[2]) : undefined); }
@@ -202,6 +204,7 @@ async function vHome() {
     <div class="goal"><div class="ring" style="--p:${gp}"><span>${S.today}/${GOAL}</span></div>
       <div><b>${gp >= 100 ? 'Цель дня выполнена 🎉' : 'Цель дня — 30 баллов'}</b><span class="small muted">${gp >= 100 ? 'Серия продолжается. Завтра — новая цель' : 'Урок, квиз или блиц — и серия не прервётся'}</span></div></div>
     <a class="shopban" href="#/shop"><span class="e">🎁</span><div><b>Магазин наград</b><small>На счету ⭐ ${s.balance ?? s.total} — обменяй на кофе или десерт</small></div><span class="go">›</span></a>
+    <a class="teamban comp" href="#/compete" id="compBan"><span class="e">⚔️</span><div><b>Задания недели</b><small>Битва ресторанов и награды</small></div><span class="go">›</span></a>
     <a class="teamban" href="#/team"><span class="e">👋</span><div><b>Лента команды</b><small>${S.unread ? `Новых записей: ${S.unread}` : 'Фото смены, поздравления, «спасибо коллеге»'}</small></div>${S.unread ? `<i class="dotn">${S.unread > 9 ? '9+' : S.unread}</i>` : '<span class="go">›</span>'}</a>
     ${s.due ? `<a class="tile hot" href="#/play/review" style="min-height:auto;flex-direction:row;align-items:center;gap:14px;justify-content:flex-start"><span class="e">🔁</span><div><b>Повторить ${s.due} ${plural(s.due, 'вопрос', 'вопроса', 'вопросов')}</b><div class="small muted">Освежи, пока не забылось</div></div></a>` : ''}
     <div class="sec-t"><span class="h2">Меню знаний</span><a href="#/learn">Все</a></div>
@@ -214,6 +217,9 @@ async function vHome() {
   if (!tour()) greetDaily(nb);
   if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
+  compeSummary(sb, S.concept).then((x) => { const el = document.getElementById('compBan'); if (!x || !el) return;
+    el.querySelector('small').textContent = x.claim ? 'Есть награда — забери!' : `Выполнено ${x.done} из ${x.total} · битва ресторанов`;
+    if (x.claim) el.classList.add('hot'); });
 }
 const TOUR = [
   { mood: 'invite', t: 'Привет, NAME!', x: 'Я Шефи — твой наставник. За минуту покажу, как здесь всё устроено.' },
@@ -388,6 +394,7 @@ async function vGames() {
   const vilka = S.concept === 'vilka';
   $app.innerHTML = h`<div class="stack">
     <div class="row"><a class="back" href="#/home">‹</a><div class="h1">Играть</div></div>
+    <a class="game g-comp" href="#/compete"><span class="e">⚔️</span><div><b>Соревнования</b><small>Битва ресторанов и задания недели</small></div><span class="go">›</span></a>
     <div class="sec-t"><span class="h2">Квесты</span></div>
     ${S.quests.filter((q) => q.kind === 'quest').map((q) => questCard(q, q.id === S.mainQuest?.id ? S.quest : new Set())).join('') || '<p class="muted">Квесты скоро появятся.</p>'}
     <div class="sec-t"><span class="h2">Симуляторы: гость</span></div>
@@ -703,7 +710,7 @@ function codeModal(name, phone, code) {
 }
 
 async function vAdmin(tab, arg) {
-  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['quests', 'Квесты'], ['shop', 'Магазин'], ['cast', 'Персонажи']];
+  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['quests', 'Квесты'], ['compete', 'Соревнования'], ['shop', 'Магазин'], ['cast', 'Персонажи']];
   const top = `<div class="stack"><div class="row between"><div class="h1">Кабинет</div>${conceptSwitch()}</div>
     <div class="atabs">${T.map(([k, n]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${n}</a>`).join('')}</div><div id="ab" class="stack"><div class="spin"></div></div></div>`;
   $app.innerHTML = top; bindConceptSwitch();
@@ -715,6 +722,7 @@ async function vAdmin(tab, arg) {
   if (tab === 'cast') return aCast(ab);
   if (tab === 'shop') return aShop(ab);
   if (tab === 'quests') return aQuests(ab, arg);
+  if (tab === 'compete') return aCompete(ctx(), ab);
 }
 
 async function aStaff(ab) {
@@ -828,7 +836,7 @@ async function aNews(ab) {
   ab.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => { if (!(await ask('Удалить новость?', 'Удалить', true))) return; await sb.from('news').delete().eq('id', b.dataset.del); aNews(ab); });
 }
 
-const ctx = () => ({ sb, S, $app, toast, plus, confetti, loadBase, route });
+const ctx = () => ({ sb, S, $app, toast, plus, confetti, loadBase, route, ask });
 function badgeWatch(){ const on=!!document.getElementById('nl-badge-frame'); document.body.classList.toggle('nlb',on); }
 new MutationObserver(badgeWatch).observe(document.body,{childList:true}); badgeWatch();
 boot();

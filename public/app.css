@@ -550,3 +550,40 @@ details summary{cursor:pointer;padding:6px 0}
 .who span:last-child{display:flex;flex-direction:column}.who small{color:var(--muted);font-size:12.5px}
 .who.on{border-color:var(--acc2);background:color-mix(in srgb,var(--acc2) 18%,var(--card2))}
 .bdl{display:flex;align-items:center;gap:6px;margin-top:4px}.bdl input{padding:4px 8px;width:auto;font-size:13px;border-width:1px}
+
+/* ---------- соревнования ---------- */
+.teamban.hot{border:2px solid var(--acc2);background:color-mix(in srgb,var(--acc2) 14%,var(--card))}
+.game.g-comp{background:var(--hero);color:#fff;border:0}.game.g-comp small{color:rgba(255,255,255,.8)}.game.g-comp .go{color:#fff}
+.arena{border-radius:var(--r-lg);padding:16px;background:var(--hero);color:#fff;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.ar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.ar-k{display:block;font-size:13px;font-weight:800;opacity:.85}
+.ar-t{font-family:var(--display);font-weight:var(--dw);font-size:22px}
+.seg.sm{background:rgba(0,0,0,.22);padding:3px;border-radius:12px}.seg.sm button{padding:6px 10px;font-size:13px;color:rgba(255,255,255,.75)}
+.seg.sm button.on{background:#fff;color:#1a1205}
+.ar-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:end}
+.col{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;min-width:0}
+.col .cv{font-weight:900;font-size:18px}
+.col .cb{width:100%;height:150px;display:flex;align-items:flex-end;background:rgba(0,0,0,.18);border-radius:14px;overflow:hidden}
+.col .cb i{position:relative;display:block;width:100%;border-radius:14px 14px 0 0;background:linear-gradient(to top,rgba(255,255,255,.55),rgba(255,255,255,.9))}
+.col.c-vilka .cb i{background:linear-gradient(to top,#d2400f,#ffb020)}
+.col.c-grano .cb i{background:linear-gradient(to top,#6f7a24,#e3c56b)}
+.col .cb em{position:absolute;top:-2px;left:50%;transform:translate(-50%,-100%);font-style:normal;font-size:22px}
+.col.win .cb{overflow:visible}
+.col b{font-size:13px;line-height:1.15;word-break:break-word}.col small{font-size:11px;opacity:.8}
+.col.me b{background:#fff;color:#1a1205;border-radius:8px;padding:1px 6px}
+.ar-n{font-size:12.5px;opacity:.85}
+.chl{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:14px}
+.chl .ci{font-size:30px;flex:none;width:46px;height:46px;display:grid;place-items:center;background:var(--card2);border-radius:14px}
+.chl .cm{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}.chl .cm small{color:var(--muted);font-size:12.5px}
+.chl .cp{font-size:12.5px;font-weight:700;color:var(--muted)}
+.chl .cr{flex:none}
+.chl.done{border-color:var(--acc2)}.chl.got{opacity:.7}
+.cbar{height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:4px}
+.cbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.chl.done .cbar i{background:var(--ok)}
+.season{flex-direction:column;align-items:stretch;gap:10px;border:2px solid var(--acc2)}
+.se-h{display:flex;gap:12px;align-items:center}.se-h small{display:block;color:var(--muted);font-size:13px}
+.se-t{display:flex;flex-direction:column;gap:8px}
+.se-r{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;font-size:14px}
+.se-r .cbar{margin:0}.se-r.me span{font-weight:900;color:var(--acc)}
+@media (max-width:380px){.ar-cols{gap:5px}.col .cv{font-size:15px}.chl{flex-wrap:wrap}.chl .cr{width:100%}.chl .cr .btn{width:100%}}
