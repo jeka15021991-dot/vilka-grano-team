@@ -699,7 +699,7 @@ async function vMe() {
   <div class="stack">
     <div class="row between"><span></span><button class="btn sm ghost" id="out2">Выйти</button></div>
     <div class="prof"><div class="ava xl" style="--p:${L.pct}"><b>${esc(initials(S.me.full_name))}</b></div>
-      <div class="h1">${esc(S.me.full_name)}</div><div class="muted small">${POS[S.me.position] || ''}, ${esc(r?.name || '')}</div></div>
+      <div class="h1">${esc(S.me.full_name)}</div><div class="muted small">${isAdmin() ? 'Сервис-менеджер VILKA и GRANO' : `${POS[S.me.position] || ''}, ${esc(r?.name || '')}`}</div></div>
     ${isAdmin() ? '' : '<a class="pathban" href="#/path"><span class="e">🗺️</span><div><b>Карта развития</b><small>Путь от новичка до эксперта и аттестации</small></div><span class="go">›</span></a>'}
     <div class="lvlcard"><div class="row between"><span class="lv">${L.icon} ${L.name}</span><b>⭐ ${S.stats.total}</b></div><div class="bar"><i style="width:${L.pct}%"></i></div>
       <span class="small" style="opacity:.9">${L.next ? `До уровня «${L.next[1]}» — ${L.next[0] - S.stats.total} баллов` : 'Максимальный уровень'}</span></div>
