@@ -4,6 +4,7 @@ import { vQuest, vSim, questCard, loadDone, loadQuests } from './quest.js';
 import { Character, coach, closeCoach, MOODS, CAST, whoFor } from './characters.js';
 import { vTeam, feedUnread } from './team.js';
 import { vCompete, aCompete, compeSummary } from './compete.js';
+import { aDash, aControl, aAssign, homeAssignments, bindHomeAssignments } from './control.js';
 
 const SB_URL = 'https://qapsxeriquyidfxgtccj.supabase.co';
 const SB_KEY = 'sb_publishable_pkhdRyL8FhjAHaKgXmuh6Q_Oi0zlZ9S';
@@ -157,7 +158,7 @@ async function route() {
     if (r === 'compete') { tabs('team'); return await vCompete(ctx()); }
     if (r === 'rating') { tabs('team'); return await vRating(p[1] || 'month'); }
     if (r === 'me') { tabs('me'); return await vMe(); }
-    if (r === 'admin' && isAdmin()) { tabs('admin'); return await vAdmin(p[1] || 'staff', p[2] ? decodeURIComponent(p[2]) : undefined); }
+    if (r === 'admin' && isAdmin()) { tabs('admin'); return await vAdmin(p[1] || 'dash', p[2] ? decodeURIComponent(p[2]) : undefined); }
     location.hash = '#/home';
   } catch (e) { console.error(e); $app.innerHTML = `<div class="card stack"><b>Что-то пошло не так</b><p class="muted small">${esc(e.message || e)}</p><a class="btn" href="#/home">На главную</a></div>`; }
 }
@@ -199,6 +200,7 @@ async function vHome() {
       <a class="b3 b3-play" href="#/games"><span class="e">🎮</span><b>Играть</b><small>квест, блиц</small></a>
       <a class="b3 b3-rate" href="#/rating"><span class="e">🏆</span><b>Рейтинг</b><small>${S.stats.month} за месяц</small></a>
     </div>
+    <div id="asgn"></div>
     ${S.mainQuest && S.quest.size < S.mainQuest.steps.length ? questCard(S.mainQuest, S.quest) : ''}
     ${hero}
     <div class="goal"><div class="ring" style="--p:${gp}"><span>${S.today}/${GOAL}</span></div>
@@ -217,6 +219,7 @@ async function vHome() {
   if (!tour()) greetDaily(nb);
   if (unread.length) sb.from('news_reads').insert(unread.map((n) => ({ news_id: n.id, user_id: S.me.id }))).then(() => {});
   bindConceptSwitch();
+  if (!isAdmin()) homeAssignments(ctx()).then((html) => { const el = document.getElementById('asgn'); if (el && html) { el.innerHTML = html; bindHomeAssignments(ctx()); } });
   compeSummary(sb, S.concept).then((x) => { const el = document.getElementById('compBan'); if (!x || !el) return;
     el.querySelector('small').textContent = x.claim ? 'Есть награда — забери!' : `Выполнено ${x.done} из ${x.total} · битва ресторанов`;
     if (x.claim) el.classList.add('hot'); });
@@ -709,12 +712,24 @@ function codeModal(name, phone, code) {
   m.querySelector('#cl').onclick = () => m.remove();
 }
 
+const AGROUPS = [
+  ['dash', 'Сводка', [['dash', 'Сводка']]],
+  ['control', 'SERVICE CONTROL', [['control', 'SERVICE CONTROL']]],
+  ['team', 'Команда', [['staff', 'Сотрудники'], ['progress', 'Прогресс']]],
+  ['learn', 'Обучение', [['assign', 'Задания сотрудникам'], ['questions', 'Вопросы'], ['quests', 'Квесты и симуляторы']]],
+  ['fun', 'Вовлечение', [['compete', 'Соревнования'], ['news', 'Новости'], ['shop', 'Магазин'], ['cast', 'Шефи']]],
+];
 async function vAdmin(tab, arg) {
-  const T = [['staff', 'Сотрудники'], ['questions', 'Вопросы'], ['progress', 'Прогресс'], ['news', 'Новости'], ['quests', 'Квесты'], ['compete', 'Соревнования'], ['shop', 'Магазин'], ['cast', 'Персонажи']];
+  const g = AGROUPS.find((x) => x[2].some(([k]) => k === tab)) || AGROUPS[0];
   const top = `<div class="stack"><div class="row between"><div class="h1">Кабинет</div>${conceptSwitch()}</div>
-    <div class="atabs">${T.map(([k, n]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${n}</a>`).join('')}</div><div id="ab" class="stack"><div class="spin"></div></div></div>`;
+    <div class="agroups">${AGROUPS.map(([k, n, subs]) => `<a href="#/admin/${subs[0][0]}" class="${g[0] === k ? 'on' : ''} ${k === 'control' ? 'sc' : ''}">${n}</a>`).join('')}</div>
+    ${g[2].length > 1 ? `<div class="atabs">${g[2].map(([k, n]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${n}</a>`).join('')}</div>` : ''}
+    <div id="ab" class="stack"><div class="spin"></div></div></div>`;
   $app.innerHTML = top; bindConceptSwitch();
   const ab = document.getElementById('ab');
+  if (tab === 'dash') return aDash(ctx(), ab);
+  if (tab === 'control') return aControl(ctx(), ab, arg);
+  if (tab === 'assign') return aAssign(ctx(), ab);
   if (tab === 'staff') return aStaff(ab);
   if (tab === 'questions') return aQuestions(ab, arg);
   if (tab === 'progress') return aProgress(ab);
