@@ -212,10 +212,11 @@ async function reports(cb) {
   cb.querySelector('#mn').onclick = () => { if (mOff < 0) { mOff++; reports(cb); } };
   const LBL = { waiters: 'Официантов на смене', stop: 'Стоп-лист', go: 'Гоу-лист', brief: 'Тема пятиминутки', first: 'Первый гость', breakfasts: 'Завтраков', staff: 'Персонала', reserves: 'Резервов', extra: 'Дополнительно', feedback: 'Обратная связь гостей', situations: 'Ситуации', decisions: 'Принятые решения', clean: 'Генуборка проведена' };
   const showRep = (k) => { const x = RD[k]; if (!x) return false; const [r, d, sl] = k.split('|');
-    const body = Object.entries(x.data || {}).filter(([, v]) => v !== '' && v !== false && v != null).map(([kk, v]) => `<div><b>${esc(LBL[kk] || kk)}:</b> ${v === true ? '✓' : esc(v).replace(/\n/g, '<br>')}</div>`).join('');
+    const photos = (x.data?.photos || []).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:10px"></a>`).join('');
+    const body = Object.entries(x.data || {}).filter(([kk, v]) => kk !== 'photos' && v !== '' && v !== false && v != null).map(([kk, v]) => `<div><b>${esc(LBL[kk] || kk)}:</b> ${v === true ? '✓' : esc(v).replace(/\n/g, '<br>')}</div>`).join('');
     const m = modal(`<div class="row between"><b class="h2">${{ morning: '☀️ Утренний', evening: '🌆 Вечерний', night: '🌙 Итоговый' }[sl]} отчёт</b><button class="pm" data-x>✕</button></div>
       <span class="small muted">${esc(rname(r))} · ${ru(d)} · сдан в ${new Date(x.submitted_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · ${ST[M[k]] || ''}</span>
-      <div class="stack" style="gap:6px">${body || '<span class="muted">Пусто</span>'}</div>
+      <div class="stack" style="gap:6px">${body || '<span class="muted">Пусто</span>'}</div>${photos ? `<div class="row" style="flex-wrap:wrap;gap:6px">${photos}</div>` : ''}
       <span class="small muted">Поправить оценку:</span><div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(ST).map(([kk, v]) => `<button class="btn sm ${M[k] === kk ? '' : 'ghost'}" data-st="${kk}">${v}</button>`).join('')}</div>`, 'wide-m');
     m.querySelectorAll('[data-st]').forEach((b2) => b2.onclick = async () => { await C.sb.from('shift_reports').upsert({ restaurant_id: r, day: d, slot: sl, status: b2.dataset.st, source: 'admin', at: new Date().toISOString() }); m.remove(); reports(cb); });
     return true; };

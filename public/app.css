@@ -836,3 +836,4 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .fl{display:flex;flex-direction:column;gap:4px}.fl span{font-size:13px;font-weight:800;color:var(--muted)}
 .btn.wa{background:#25d366;color:#fff;box-shadow:0 4px 0 #1a9e4b}
 .pill.mid-p{background:var(--acc2);color:#1a1205}
+.rpv{display:flex;gap:6px;flex-wrap:wrap}.rpv img{width:72px;height:72px;object-fit:cover;border-radius:10px}

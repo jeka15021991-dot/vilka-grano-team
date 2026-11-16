@@ -1,4 +1,5 @@
 /* Вкладка «Смена» для администратора точки */
+import { shrink } from './team.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ru = (s) => s ? new Date(String(s).length === 10 ? s + 'T12:00' : s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : '';
 const hm = (s) => new Date(s).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -97,22 +98,39 @@ async function mountReports(ctx, box, st) {
         if (type === 'check') return `<label class="switch"><input type="checkbox" data-k="${k}" ${v ? 'checked' : ''}> ${label}</label>`;
         if (type === 'area') return `<label class="fl"><span>${label}</span><textarea data-k="${k}" rows="2" placeholder="${esc(ph || '')}">${esc(v)}</textarea></label>`;
         return `<label class="fl"><span>${label}</span><input data-k="${k}" type="${type === 'number' ? 'number' : type === 'time' ? 'time' : 'text'}" inputmode="${type === 'number' ? 'numeric' : 'text'}" value="${esc(v)}"></label>`; }).join('')}
+      <label class="photo-in"><input type="file" accept="image/*" multiple id="rp" hidden><span id="rpl">📷 Прикрепить фото${(prev.photos || []).length ? ` (сейчас ${prev.photos.length})` : ''}</span></label>
+      <div class="rpv" id="rpv">${(prev.photos || []).map((u) => `<img src="${esc(u)}" alt="">`).join('')}</div>
       <button class="btn block wa" id="rs">Сохранить и отправить в WhatsApp</button>
       <button class="btn ghost block" id="rc">Только сохранить и скопировать текст</button></div>`;
     document.body.appendChild(m);
     m.onclick = (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); };
+    let files = [];
+    m.querySelector('#rp').onchange = async (e) => {
+      const add = [...e.target.files].slice(0, 6);
+      for (const f of add) { try { const b = await shrink(f); files.push(new File([b], `foto-${Date.now()}-${files.length}.jpg`, { type: 'image/jpeg' })); } catch (er) {} }
+      m.querySelector('#rpv').innerHTML = files.map((f) => `<img src="${URL.createObjectURL(f)}" alt="">`).join('');
+      m.querySelector('#rpl').textContent = `📷 Фото: ${files.length} — добавить ещё`;
+    };
     const collect = () => { const o = {}; m.querySelectorAll('[data-k]').forEach((i) => (o[i.dataset.k] = i.type === 'checkbox' ? i.checked : i.value)); return o; };
     const go = async (wa, btn) => {
       const data = collect();
       if (slot === 'morning' && !String(data.waiters || '').trim()) return toast('Укажите количество официантов');
-      btn.disabled = true;
+      btn.disabled = true; btn.textContent = 'Сохраняю…';
+      data.photos = prev.photos || [];
+      if (files.length) {
+        data.photos = [];
+        for (const f of files) { const path = `${S.me.id}/r-${Date.now()}-${data.photos.length}.jpg`; const up = await sb.storage.from('feed').upload(path, f, { contentType: 'image/jpeg' }); if (!up.error) data.photos.push(sb.storage.from('feed').getPublicUrl(path).data.publicUrl); }
+      }
       const { data: res, error } = await sb.rpc('lead_report', { p_slot: slot, p_data: data });
       if (error) { toast(error.message); btn.disabled = false; return; }
       const text = toText(slot, rest, res.day, f, data);
       try { await navigator.clipboard.writeText(text); } catch (e) {}
       m.remove();
       toast(res.status === 'ok' ? 'Отчёт сохранён — вовремя ✓' : `Отчёт сохранён, срок был ${res.deadline}`);
-      if (wa) window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+      if (wa) {
+        if (files.length && navigator.canShare && navigator.canShare({ files })) { try { await navigator.share({ text, files }); } catch (e) {} }
+        else window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+      }
       mountReports(ctx, box, st);
     };
     m.querySelector('#rs').onclick = (e) => go(true, e.target);
