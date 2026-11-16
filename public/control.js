@@ -173,15 +173,22 @@ async function reports(cb) {
   const days = [...Array(7)].map((_, i) => { const d = new Date(t); d.setDate(t.getDate() + i); return d; });
   const m0 = new Date(); m0.setDate(1); m0.setMonth(m0.getMonth() + mOff); const mS = ymd(m0);
   const ids = rests().map((r) => r.id);
-  const [{ data }, { data: mc }, mg] = await Promise.all([
+  const [{ data }, { data: mc }, mg, { data: rdata }] = await Promise.all([
     C.sb.from('shift_reports').select('*').in('restaurant_id', ids).gte('day', ymd(days[0])).lte('day', ymd(days[6])),
-    C.sb.from('monthly_checks').select('*').in('restaurant_id', ids).eq('month', mS), loadMgrs()]);
+    C.sb.from('monthly_checks').select('*').in('restaurant_id', ids).eq('month', mS), loadMgrs(),
+    C.sb.from('shift_report_data').select('*').in('restaurant_id', ids).gte('day', ymd(days[0])).lte('day', ymd(days[6]))]);
+  const RD = {}; (rdata || []).forEach((x) => (RD[`${x.restaurant_id}|${x.day}|${x.slot}`] = x));
   const M = {}, SRC = {}; (data || []).forEach((x) => { const k = `${x.restaurant_id}|${x.day}|${x.slot}`; M[k] = x.status; if (x.source === 'lead') SRC[k] = x.at; });
   const MC = {}; (mc || []).forEach((x) => (MC[`${x.restaurant_id}|${x.kind}|${x.manager_id || 0}`] = x));
   const today = ymd(new Date());
   const cell = (r, d, s, l, tt) => { const k = `${r}|${d}|${s}`, v = M[k], self = SRC[k]; return `<button class="s ${v || ''} ${self ? 'self' : ''}" data-r="${r}" data-d="${d}" data-s="${s}" title="${tt}${v ? ': ' + ST[v] : ''}${self ? ' · отметил администратор в ' + new Date(self).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}">${l}</button>`; };
   const mbtn = (r, kind, mid, label) => { const x = MC[`${r}|${kind}|${mid || 0}`]; return `<button class="mchk ${x?.status || ''}" data-mr="${r}" data-mk="${kind}" data-mm="${mid || ''}"><span>${label}</span><b>${x?.status ? ST[x.status] : 'Отметить'}</b></button>`; };
-  cb.innerHTML = `<div class="disc-note">Отмечайте одним нажатием: <span class="s ok">✓</span> вовремя, <span class="s late">!</span> с опозданием или позже (например, «пятиминутку проведём после уборки»), <span class="s none">✕</span> не сделано. Повторное нажатие очищает. Квадрат с точкой — администратор отметил сам; наведите или нажмите, чтобы поправить.</div>
+  const tday = ymd(new Date(Date.now() - 6 * 36e5));
+  const RN = { morning: '☀️ Утро', evening: '🌆 Вечер', night: '🌙 Итог' };
+  const todayHtml = wkOff === 0 ? `<div class="card stack"><b>Отчёты сегодня</b>${rests().map((r) => `<div class="li"><span>${esc(short(r.name))}</span><span class="row" style="gap:4px">${Object.keys(RN).map((sl) => { const x = RD[`${r.id}|${tday}|${sl}`], v = M[`${r.id}|${tday}|${sl}`];
+      return `<button class="pill ${x ? (v === 'late' ? 'mid-p' : 'ok') : ''}" data-rv="${r.id}|${tday}|${sl}">${RN[sl]}${x ? ' ' + new Date(x.submitted_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ' —'}</button>`; }).join('')}</span></div>`).join('')}
+    <span class="small muted">Администраторы заполняют отчёт во вкладке «Смена» и отправляют в WhatsApp одной кнопкой — время фиксируется само. Нажмите, чтобы прочитать.</span></div>` : '';
+  cb.innerHTML = todayHtml + `<div class="disc-note">Отмечайте одним нажатием: <span class="s ok">✓</span> вовремя, <span class="s late">!</span> с опозданием или позже (например, «пятиминутку проведём после уборки»), <span class="s none">✕</span> не сделано. Повторное нажатие очищает. Квадрат с точкой — администратор отметил сам; наведите или нажмите, чтобы поправить.</div>
     <div class="row between"><button class="btn sm ghost" id="wp">‹</button><b>Неделя ${ru(ymd(days[0]))} – ${ru(ymd(days[6]))}</b><button class="btn sm ghost" id="wn" ${wkOff >= 0 ? 'disabled' : ''}>›</button></div>
     <div class="legend small muted">П — пятиминутка · У — утренний отчёт · В — вечерний · Н — ночной · Г — генеральная уборка (воскресенье)</div>
     <div class="tw"><table class="t rep"><tr><th></th>${days.map((d) => `<th class="${ymd(d) === today ? 'td' : ''}">${d.toLocaleDateString('ru-RU', { weekday: 'short' })}<br><small>${d.getDate()}</small></th>`).join('')}<th>Итог</th></tr>
@@ -203,8 +210,20 @@ async function reports(cb) {
   cb.querySelector('#wn').onclick = () => { if (wkOff < 0) { wkOff++; reports(cb); } };
   cb.querySelector('#mp').onclick = () => { mOff--; reports(cb); };
   cb.querySelector('#mn').onclick = () => { if (mOff < 0) { mOff++; reports(cb); } };
+  const LBL = { waiters: 'Официантов на смене', stop: 'Стоп-лист', go: 'Гоу-лист', brief: 'Тема пятиминутки', first: 'Первый гость', breakfasts: 'Завтраков', staff: 'Персонала', reserves: 'Резервов', extra: 'Дополнительно', feedback: 'Обратная связь гостей', situations: 'Ситуации', decisions: 'Принятые решения', clean: 'Генуборка проведена' };
+  const showRep = (k) => { const x = RD[k]; if (!x) return false; const [r, d, sl] = k.split('|');
+    const body = Object.entries(x.data || {}).filter(([, v]) => v !== '' && v !== false && v != null).map(([kk, v]) => `<div><b>${esc(LBL[kk] || kk)}:</b> ${v === true ? '✓' : esc(v).replace(/\n/g, '<br>')}</div>`).join('');
+    const m = modal(`<div class="row between"><b class="h2">${{ morning: '☀️ Утренний', evening: '🌆 Вечерний', night: '🌙 Итоговый' }[sl]} отчёт</b><button class="pm" data-x>✕</button></div>
+      <span class="small muted">${esc(rname(r))} · ${ru(d)} · сдан в ${new Date(x.submitted_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · ${ST[M[k]] || ''}</span>
+      <div class="stack" style="gap:6px">${body || '<span class="muted">Пусто</span>'}</div>
+      <span class="small muted">Поправить оценку:</span><div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(ST).map(([kk, v]) => `<button class="btn sm ${M[k] === kk ? '' : 'ghost'}" data-st="${kk}">${v}</button>`).join('')}</div>`, 'wide-m');
+    m.querySelectorAll('[data-st]').forEach((b2) => b2.onclick = async () => { await C.sb.from('shift_reports').upsert({ restaurant_id: r, day: d, slot: sl, status: b2.dataset.st, source: 'admin', at: new Date().toISOString() }); m.remove(); reports(cb); });
+    return true; };
+  cb.querySelectorAll('[data-rv]').forEach((b) => b.onclick = () => { if (!showRep(b.dataset.rv)) C.toast('Отчёт ещё не сдан'); });
   cb.querySelectorAll('.s[data-r]').forEach((b) => b.onclick = async () => {
-    const k = `${b.dataset.r}|${b.dataset.d}|${b.dataset.s}`, nv = NEXT[M[k]];
+    const k = `${b.dataset.r}|${b.dataset.d}|${b.dataset.s}`;
+    if (showRep(k)) return;
+    const nv = NEXT[M[k]];
     const q = nv ? C.sb.from('shift_reports').upsert({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s, status: nv, source: 'admin', at: new Date().toISOString() })
       : C.sb.from('shift_reports').delete().match({ restaurant_id: b.dataset.r, day: b.dataset.d, slot: b.dataset.s });
     M[k] = nv; delete SRC[k]; b.className = 's ' + (nv || '');

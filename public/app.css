@@ -825,3 +825,14 @@ table.rep .td{background:color-mix(in srgb,var(--acc) 10%,transparent)}
 .fp-bd{background:color-mix(in srgb,#ff4d8d 12%,var(--card))}
 .fp-btns{display:flex;gap:8px}.fp-btns .btn{flex:1}
 @media (min-width:600px){.gc{width:170px}}
+
+/* ---------- отчёты смены ---------- */
+.reps{display:flex;flex-direction:column;gap:8px}
+.rep{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px;border-radius:var(--r-md);border:2px solid var(--line);background:var(--card)}
+.rep .e{font-size:26px}.rep .mt{flex:1;display:flex;flex-direction:column}.rep small{color:var(--muted);font-size:12.5px}
+.rep .ck{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:var(--card2);font-size:18px}
+.rep.ok{border-color:var(--ok)}.rep.ok .ck{background:var(--ok);color:#fff}.rep.ok small{color:var(--ok)}
+.rep.late{border-color:var(--acc2)}.rep.late .ck{background:var(--acc2);color:#fff}.rep.late small{color:var(--acc2)}
+.fl{display:flex;flex-direction:column;gap:4px}.fl span{font-size:13px;font-weight:800;color:var(--muted)}
+.btn.wa{background:#25d366;color:#fff;box-shadow:0 4px 0 #1a9e4b}
+.pill.mid-p{background:var(--acc2);color:#1a1205}

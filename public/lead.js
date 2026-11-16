@@ -19,10 +19,9 @@ export async function vShift(ctx) {
     <div><span class="small muted" style="text-transform:capitalize">${today}</span><div class="h1">Смена · ${esc(String(d.rest || '').replace(/^VILKA\s+/, ''))}</div></div>
     ${d.brief ? `<details class="brief-home" open><summary><span class="e">📣</span><div><small>Тема пятиминутки сегодня</small><b>${esc(d.brief.title)}</b></div></summary>${d.brief.body ? `<div class="bb">${esc(d.brief.body).replace(/\n/g, '<br>')}</div>` : ''}</details>`
       : '<div class="card small muted">На сегодня тема пятиминутки не задана — проведите её по текущим задачам смены.</div>'}
-    <div class="card stack" id="lsum"><b>📝 Итоги пятиминутки</b><span class="small muted">Напишите кратко после пятиминутки — итоги появятся у ваших сотрудников на главной, каждый нажмёт «Ознакомлен(а)».</span><div class="spin" style="width:22px;height:22px"></div></div>
-    <div class="sec-t"><span class="h2">Отметки дня</span></div>
-    <div class="marks">${slots.map(([k, e, t, sub]) => { const m = d.marks[k]; const byAdmin = m && m.source === 'admin';
-      return `<button class="mark ${m ? 'on ' + m.status : ''}" data-m="${k}" ${byAdmin ? 'disabled' : ''}><span class="e">${e}</span><span class="mt"><b>${t}</b><small>${m ? (byAdmin ? 'Отметил сервис-менеджер: ' + ST[m.status] : 'Отмечено в ' + hm(m.at)) : sub}</small></span><span class="ck">${m ? '✓' : ''}</span></button>`; }).join('')}</div>
+    <details class="card stack" id="lsum"><summary><b>📝 Итоги пятиминутки для команды</b> <span class="small muted">· по желанию</span></summary><span class="small muted">Если хотите, чтобы ребята отметили «Ознакомлен(а)» в приложении — напишите итоги здесь.</span><div class="spin" style="width:22px;height:22px"></div></details>
+    <div class="sec-t"><span class="h2">Отчёты смены</span><span class="small muted">заполнил → отправил в WhatsApp</span></div>
+    <div class="reps" id="reps"><div class="spin" style="width:24px;height:24px"></div></div>
     <div class="sec-t"><span class="h2">Мои задачи</span><span class="small muted">${open.length ? `открыто ${open.length}` : ''}</span></div>
     ${open.length ? open.map((t) => task(t)).join('') : '<p class="muted">Открытых задач нет 👍</p>'}
     ${done.length ? `<details><summary class="small muted">Выполненные (${done.length})</summary><div class="stack" style="gap:8px;margin-top:8px">${done.map((t) => task(t)).join('')}</div></details>` : ''}
@@ -44,13 +43,7 @@ export async function vShift(ctx) {
       <div class="row between"><span class="small muted">${sm ? `Ознакомились: ${sm.reads} из ${sm.staff}` : ''}</span><button class="btn sm" id="lss">${sm ? 'Обновить' : 'Опубликовать'}</button></div>`;
     box.querySelector('#lss').onclick = async () => { const { error: e } = await sb.rpc('summary_save', { p_rest: null, p_body: box.querySelector('#lst').value }); toast(e ? e.message : 'Итоги опубликованы'); if (!e) vShift(ctx); };
   });
-  $app.querySelectorAll('[data-m]').forEach((b) => b.onclick = async () => {
-    const on = !b.classList.contains('on'); b.disabled = true;
-    const { error: e } = await sb.rpc('lead_mark', { p_slot: b.dataset.m, p_done: on });
-    if (e) { toast(e.message); b.disabled = false; return; }
-    if (on) ctx.plus && navigator.vibrate?.(20);
-    vShift(ctx);
-  });
+  mountReports(ctx, $app.querySelector('#reps'), d);
   $app.querySelectorAll('[data-t]').forEach((c) => c.onchange = async () => {
     const { error: e } = await sb.rpc('lead_task', { p_id: +c.dataset.t, p_done: c.checked });
     if (e) toast(e.message); else { if (c.checked) ctx.confetti(); vShift(ctx); }
@@ -63,5 +56,66 @@ export async function vShift(ctx) {
     const late = !t.done_at && t.due && t.due < new Date().toISOString().slice(0, 10);
     return `<div class="task ${t.done_at ? 'dn' : ''} ${late ? 'late' : ''}"><label><input type="checkbox" data-t="${t.id}" ${t.done_at ? 'checked' : ''}></label>
       <div class="tt"><b>${esc(t.title)}</b><small>${t.personal ? 'Лично вам' : 'Всем администраторам точки'}${t.due ? ' · до ' + ru(t.due) : ''}${t.done_at ? ' · выполнено ' + ru(t.done_at) : ''}</small>${t.note ? `<span class="small">${esc(t.note)}</span>` : ''}</div></div>`;
+  }
+}
+
+/* ---------- отчёты смены: форма → WhatsApp ---------- */
+const CODE = { grano: 'GRANO', 'vilka-kazybek': 'B1 · Казыбек би', 'vilka-muratbaeva': 'B2 · Муратбаева', 'vilka-abaya': 'B3 · Абая' };
+const REP = {
+  morning: { ic: '☀️', t: 'Утренний отчёт', dl: 'до 11:30' },
+  evening: { ic: '🌆', t: 'Вечерний отчёт', dl: 'до 17:00' },
+  night: { ic: '🌙', t: 'Итоговый отчёт', dl: 'после закрытия, день в день' },
+};
+function fields(slot, grano, sunday, brief) {
+  if (slot === 'morning') return [
+    ['waiters', 'Официантов на смене', 'number'], ['stop', 'Стоп-лист', 'area', 'Чего нет сегодня'], ['go', 'Гоу-лист', 'area', 'Что продаём в первую очередь'],
+    ['brief', 'Тема пятиминутки', 'text', '', brief || ''],
+    ...(grano ? [['first', 'Первый гость пришёл в', 'time'], ['breakfasts', 'Сколько было завтраков', 'number']] : [])];
+  if (slot === 'evening') return [['staff', 'Персонала на смене', 'number'], ['reserves', 'Резервов на вечер', 'number'], ['stop', 'Стоп-лист', 'area'], ['extra', 'Дополнительно', 'area', 'Необязательно']];
+  return [['feedback', 'Обратная связь и негативные комментарии гостей', 'area', 'Что говорили гости, жалобы'], ['situations', 'Ситуации за смену', 'area', 'Что произошло'],
+    ['decisions', 'Какие решения приняты', 'area', 'Что сделали, как решили'], ...(sunday ? [['clean', 'Генеральная уборка проведена', 'check']] : [])];
+}
+function toText(slot, rest, day, f, data) {
+  const L = [`${REP[slot].ic} ${REP[slot].t} · ${CODE[rest] || rest} · ${new Date(day + 'T12:00').toLocaleDateString('ru-RU')}`];
+  f.forEach(([k, label, type]) => { const v = data[k]; if (type === 'check') { if (v) L.push(`✅ ${label}`); return; } if (v !== undefined && String(v).trim() !== '') L.push(`${label}: ${String(v).trim()}`); });
+  return L.join('\n');
+}
+async function mountReports(ctx, box, st) {
+  const { sb, S, toast } = ctx;
+  const { data: R } = await sb.rpc('lead_reports_today');
+  const rest = S.me.restaurant_id, grano = rest === 'grano', sunday = R.dow === 7;
+  const hm = (t) => new Date(t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  box.innerHTML = Object.entries(REP).map(([k, r]) => { const x = R.reports[k];
+    return `<button class="rep ${x ? (x.status === 'late' ? 'late' : 'ok') : ''}" data-r="${k}"><span class="e">${r.ic}</span><span class="mt"><b>${r.t}</b><small>${x ? `${x.status === 'late' ? 'Сдан с опозданием' : 'Сдан вовремя'} · ${hm(x.at)}` : r.dl}</small></span><span class="ck">${x ? '✓' : '›'}</span></button>`; }).join('');
+  box.querySelectorAll('[data-r]').forEach((b) => b.onclick = () => form(b.dataset.r));
+  function form(slot) {
+    const prev = R.reports[slot]?.data || {}, f = fields(slot, grano, sunday, R.brief);
+    const m = document.createElement('div'); m.className = 'modal up';
+    m.innerHTML = `<div class="card stack cmp"><div class="row between"><b class="h2">${REP[slot].ic} ${REP[slot].t}</b><button class="pm" data-x>✕</button></div>
+      <span class="small muted">${esc(CODE[rest] || '')} · ${REP[slot].dl}</span>
+      ${f.map(([k, label, type, ph, def]) => { const v = prev[k] ?? def ?? '';
+        if (type === 'check') return `<label class="switch"><input type="checkbox" data-k="${k}" ${v ? 'checked' : ''}> ${label}</label>`;
+        if (type === 'area') return `<label class="fl"><span>${label}</span><textarea data-k="${k}" rows="2" placeholder="${esc(ph || '')}">${esc(v)}</textarea></label>`;
+        return `<label class="fl"><span>${label}</span><input data-k="${k}" type="${type === 'number' ? 'number' : type === 'time' ? 'time' : 'text'}" inputmode="${type === 'number' ? 'numeric' : 'text'}" value="${esc(v)}"></label>`; }).join('')}
+      <button class="btn block wa" id="rs">Сохранить и отправить в WhatsApp</button>
+      <button class="btn ghost block" id="rc">Только сохранить и скопировать текст</button></div>`;
+    document.body.appendChild(m);
+    m.onclick = (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); };
+    const collect = () => { const o = {}; m.querySelectorAll('[data-k]').forEach((i) => (o[i.dataset.k] = i.type === 'checkbox' ? i.checked : i.value)); return o; };
+    const go = async (wa, btn) => {
+      const data = collect();
+      if (slot === 'morning' && !String(data.waiters || '').trim()) return toast('Укажите количество официантов');
+      btn.disabled = true;
+      const { data: res, error } = await sb.rpc('lead_report', { p_slot: slot, p_data: data });
+      if (error) { toast(error.message); btn.disabled = false; return; }
+      const text = toText(slot, rest, res.day, f, data);
+      try { await navigator.clipboard.writeText(text); } catch (e) {}
+      m.remove();
+      toast(res.status === 'ok' ? 'Отчёт сохранён — вовремя ✓' : `Отчёт сохранён, срок был ${res.deadline}`);
+      if (wa) window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+      mountReports(ctx, box, st);
+    };
+    m.querySelector('#rs').onclick = (e) => go(true, e.target);
+    m.querySelector('#rc').onclick = (e) => go(false, e.target);
   }
 }
