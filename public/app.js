@@ -633,12 +633,23 @@ async function loadBook(c) {
   const raw = Uint8Array.from(atob(k.key), (ch) => ch.charCodeAt(0));
   const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(buf, 0, 12) }, key, new Uint8Array(buf, 12));
-  S.book[c] = JSON.parse(new TextDecoder().decode(pt));
+  const d = JSON.parse(new TextDecoder().decode(pt));
+  d.baseKeys = Object.keys(d.photos || {});
+  const { data: ov } = await sb.from('kb_book').select('book,photos').eq('concept', c).maybeSingle();
+  if (ov && ov.book) { d.book = ov.book; Object.assign(d.photos, ov.photos || {}); }
+  S.book[c] = d;
   return S.book[c];
 }
 async function vBook(section) {
   $app.innerHTML = '<div class="splash"><div class="spin"></div></div>';
-  window.__BOOK = await loadBook(S.concept);
+  const c = S.concept;
+  window.__BOOK = await loadBook(c);
+  window.__BOOK_ADMIN = isAdmin();
+  window.__BOOK_SAVE = async (book, photos) => {
+    const { error } = await sb.from('kb_book').upsert({ concept: c, book, photos });
+    if (error) throw error;
+    S.book[c].book = book;
+  };
   const f = document.createElement('iframe');
   f.className = 'bookframe'; f.title = 'Вкусная книга';
   f.src = `book-${S.concept}.html${section ? '#' + section : ''}`;

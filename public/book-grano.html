@@ -379,7 +379,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px sol
 </style><div class="wrap" id="wrap"></div><script type="application/json" id="book">{}</script><script type="application/json" id="photos">{}</script><script id="app">(function () {
   var $ = function (id) { return document.getElementById(id); };
   var __D = (window.parent && window.parent.__BOOK) || {book:{sections:[],news:[],outro:{}},photos:{}}; var book = __D.book, photos = __D.photos;
-  var wrap = $('wrap'), cur = book.sections[0].id, editing = false, dirty = false, canEdit = false;
+  var wrap = $('wrap'), cur = book.sections[0].id, editing = false, dirty = false, canEdit = false, snap = null;
   var AL = { 'М': ['🥛', 'молоко'], 'Г': ['🌾', 'глютен'], 'Я': ['🥚', 'яйцо'], 'Р': ['🐟', 'рыба'], 'МП': ['🦐', 'морепродукты'], 'О': ['🥜', 'орехи'], 'К': ['🫘', 'кунжут'], 'Гч': ['🟡', 'горчица'] };
   var ALC = { 'есть': 'есть алкоголь', 'можно без вина': 'есть алкоголь: можно без вина', 'убрать нельзя': 'есть алкоголь: убрать нельзя' };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -578,8 +578,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px sol
       var p = b.getAttribute('data-part'), first = book.sections.filter(function (s) { return (s.part || 'kitchen') === p; })[0];
       q.value = ''; search(); show(first.id, true); try { history.replaceState(null, '', '#' + first.id); } catch (err) {}
     }); });
-    if ($('eon')) $('eon').onclick = function () { editing = true; render(); };
-    if ($('ecancel')) $('ecancel').onclick = function () { if (dirty) { book = JSON.parse($('book').textContent); photos = JSON.parse($('photos').textContent); } editing = false; dirty = false; render(); };
+    if ($('eon')) $('eon').onclick = function () { snap = JSON.stringify({ b: book, p: photos }); editing = true; render(); };
+    if ($('ecancel')) $('ecancel').onclick = function () { if (dirty && snap) { var o = JSON.parse(snap); book = o.b; photos = o.p; } editing = false; dirty = false; render(); };
     if ($('esave')) $('esave').onclick = save;
   }
   wrap.addEventListener('click', function (e) {
@@ -655,6 +655,17 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px sol
   function save() {
     var st = $('est'), btn = $('esave'); btn.disabled = true; st.textContent = 'Сохраняю…';
     var fail = function (t) { st.textContent = t; btn.disabled = false; };
+    var P = window.parent;
+    if (P && P.__BOOK_SAVE) {
+      var base = {}; ((P.__BOOK && P.__BOOK.baseKeys) || []).forEach(function (k) { base[k] = 1; });
+      var used = {}, extra = {};
+      book.sections.forEach(function (s) { s.groups.forEach(function (g) { if (g.ph) used[g.ph] = 1; g.items.forEach(function (i) { if (i.ph) used[i.ph] = 1; }); }); });
+      Object.keys(photos).forEach(function (k) { if (used[k] && !base[k]) extra[k] = photos[k]; });
+      P.__BOOK_SAVE(JSON.parse(JSON.stringify(book)), extra).then(function () {
+        dirty = false; editing = false; render(); var e2 = $('est'); if (e2) e2.textContent = 'Сохранено. Ребята увидят правку при следующем открытии книги.';
+      }).catch(function () { fail('Не получилось сохранить. Проверьте интернет и попробуйте ещё раз.'); });
+      return;
+    }
     if (!(window.__host && window.__host.use)) return fail('Сохранение здесь недоступно. Откройте книгу по ссылке.');
     window.__host.use('artifact').then(function (art) {
       if (!art) return fail('Сохранение здесь недоступно.');
@@ -672,6 +683,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px sol
   try { var t = sessionStorage.getItem('grano_tab'); if (t) { cur = t; sessionStorage.removeItem('grano_tab'); } } catch (e) {}
   var hsh = (location.hash || '').slice(1); if (hsh) cur = hsh;
   window.__edit = function () { canEdit = true; render(); };
+  try { if (window.parent && window.parent.__BOOK_ADMIN) canEdit = true; } catch (e) {}
   render();
   if (window.__host && window.__host.use) window.__host.use('user').then(function (u) { return u ? u.canEdit() : false; }).then(function (ok) { if (ok) { canEdit = true; render(); } }).catch(function () {});
 })();
